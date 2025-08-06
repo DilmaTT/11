@@ -1,15 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { Session } from '@supabase/supabase-js';
+import { loadDataFromSupabase, syncDataToSupabase, clearLocalData } from '@/lib/data-manager';
 
 interface User {
-  username: string;
+  id: string;
+  email: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  register: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  register: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,53 +29,78 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Проверяем сохраненную сессию при загрузке
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    console.log("AuthContext: useEffect started.");
+    setLoading(true);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session: Session | null) => {
+        console.log(`AuthContext: onAuthStateChange event: ${_event}, session available: ${!!session}`);
+        
+        if (session?.user) {
+          const currentUser = { id: session.user.id, email: session.user.email! };
+          setUser(currentUser);
+          console.log("AuthContext: User state set:", currentUser);
+
+          // Запускаем загрузку данных в фоновом режиме, не блокируя UI
+          if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
+            console.log("AuthContext: Triggering non-blocking data load.");
+            loadDataFromSupabase(session.user);
+          }
+        } else {
+          setUser(null);
+          console.log("AuthContext: User state set to null.");
+          if (_event === 'SIGNED_OUT') {
+            console.log("AuthContext: Clearing local data due to SIGNED_OUT.");
+            clearLocalData();
+          }
+        }
+
+        // Важно: убираем состояние загрузки СРАЗУ ПОСЛЕ проверки сессии.
+        // Это позволит отобразить UI, не дожидаясь ответа от loadDataFromSupabase.
+        setLoading(false);
+        console.log("AuthContext: setLoading(false). UI should now be unblocked.");
+      }
+    );
+
+    return () => {
+      console.log("AuthContext: useEffect cleanup, unsubscribing from auth state changes.");
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const register = async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    if (users[username]) {
-      return { success: false, message: 'Пользователь с таким именем уже существует. Задайте другое имя.' };
+  const register = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+    console.log("AuthContext: Attempting to register user:", email);
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      console.error("AuthContext: Registration error:", error.message);
+      return { success: false, message: 'Ошибка регистрации: ' + error.message };
     }
-    
-    users[username] = { password };
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    const newUser = { username };
-    setUser(newUser);
-    localStorage.setItem('currentUser', JSON.stringify(newUser));
-    
+    if (data.user) {
+      console.log("AuthContext: User registered, syncing initial data.");
+      await syncDataToSupabase(false);
+    }
+    console.log("AuthContext: Registration successful.");
     return { success: true };
   };
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    if (!users[username]) {
-      return { success: false, message: 'Пользователь не найден.' };
+  const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+    console.log("AuthContext: Attempting to log in user:", email);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      console.error("AuthContext: Login error:", error.message);
+      return { success: false, message: 'Ошибка входа: ' + error.message };
     }
-    
-    if (users[username].password !== password) {
-      return { success: false, message: 'Неверный пароль.' };
-    }
-    
-    const loggedUser = { username };
-    setUser(loggedUser);
-    localStorage.setItem('currentUser', JSON.stringify(loggedUser));
-    
+    console.log("AuthContext: Login successful.");
     return { success: true };
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('currentUser');
+  const logout = async () => {
+    console.log("AuthContext: Attempting to log out user.");
+    await supabase.auth.signOut();
+    console.log("AuthContext: Logout initiated.");
   };
 
   return (
@@ -81,8 +111,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         isAuthenticated: !!user,
+        loading,
       }}
     >
+      {/* Убрано !loading, чтобы дочерние компоненты могли управлять своим состоянием загрузки */}
       {children}
     </AuthContext.Provider>
   );

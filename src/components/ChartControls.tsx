@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Plus, Expand } from "lucide-react";
+import { Plus, Expand, Move } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,8 @@ interface ChartControlsProps {
   onMaximizeCanvas: () => void;
   onDimensionChange: (value: string, dimension: 'width' | 'height') => void;
   onDimensionBlur: (currentValue: number, dimension: 'width' | 'height') => void;
+  isMoveMode: boolean;
+  onToggleMoveMode: () => void;
 }
 
 export const ChartControls = ({
@@ -23,6 +25,8 @@ export const ChartControls = ({
   onMaximizeCanvas,
   onDimensionChange,
   onDimensionBlur,
+  isMoveMode,
+  onToggleMoveMode,
 }: ChartControlsProps) => {
   return (
     <div className={cn(
@@ -39,6 +43,14 @@ export const ChartControls = ({
         </Button>
         <Button variant="ghost" size="icon" onClick={onMaximizeCanvas} title="Развернуть на весь экран">
           <Expand className="h-5 w-5" />
+        </Button>
+        <Button
+          variant={isMoveMode ? "secondary" : "ghost"}
+          size="icon"
+          onClick={onToggleMoveMode}
+          title="Режим перемещения (отключает изменение размера)"
+        >
+          <Move className="h-5 w-5" />
         </Button>
       </div>
       

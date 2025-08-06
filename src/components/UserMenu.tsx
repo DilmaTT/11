@@ -2,7 +2,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -12,10 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthDialog } from "./AuthDialog";
-import { Settings, Download, Upload, Menu, LogOut } from "lucide-react";
-import { importUserSettings, exportUserSettings } from "@/lib/data-manager";
-
-// Simplified UserMenu component
+import { Settings, Download, Upload, LogOut, CloudUpload, CloudDownload } from "lucide-react";
+import { importDataFromFile, exportDataToFile, syncDataToSupabase, loadDataFromSupabase, downloadCloudBackup } from "@/lib/data-manager";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,7 +28,7 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // If user is not authenticated, show login button
+  // --- UNAUTHORIZED STATE ---
   if (!isAuthenticated) {
     return (
       <>
@@ -37,7 +36,6 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
           variant="outline"
           size={isMobileMode ? "icon" : "sm"}
           onClick={() => setAuthDialogOpen(true)}
-          className={isMobileMode ? "p-0" : ""}
         >
           {isMobileMode ? (
             <Settings className="h-4 w-4" />
@@ -55,15 +53,24 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
     );
   }
 
-  // If user is authenticated
-  const userInitial = user?.username?.charAt(0).toUpperCase() || "?";
+  // --- AUTHORIZED STATE ---
+  const userInitial = user?.email?.charAt(0).toUpperCase() || "?";
 
-  // Mobile view menu
+  const handleLogout = () => {
+    logout();
+    setMobileMenuOpen(false);
+  };
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  // Mobile View (Authorized)
   if (isMobileMode) {
     return (
       <>
         <Button variant="outline" size="icon" onClick={() => setMobileMenuOpen(true)}>
-          <Menu className="h-4 w-4" />
+           <Avatar className="h-6 w-6">
+            <AvatarFallback className="text-xs">{userInitial}</AvatarFallback>
+          </Avatar>
         </Button>
         <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <DialogContent mobileFullscreen>
@@ -71,18 +78,33 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
               <DialogTitle>Меню</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-2 pt-4">
-              <Button variant="outline" onClick={importUserSettings}>
+              <div className="p-2 text-center text-sm text-muted-foreground border-b pb-4 mb-2">
+                <p>Вы вошли как</p>
+                <p className="font-semibold truncate">{user?.email}</p>
+              </div>
+              <Button variant="outline" onClick={() => { syncDataToSupabase(); closeMobileMenu(); }}>
+                <CloudUpload className="mr-2 h-4 w-4" />
+                Сохранить в облако
+              </Button>
+              <Button variant="outline" onClick={() => { loadDataFromSupabase(); closeMobileMenu(); }}>
+                <CloudDownload className="mr-2 h-4 w-4" />
+                Загрузить из облака
+              </Button>
+              <hr className="my-2"/>
+              <Button variant="outline" onClick={() => { importDataFromFile(); closeMobileMenu(); }}>
                 <Upload className="mr-2 h-4 w-4" />
-                Импорт настроек
+                Импорт из файла
               </Button>
-              <Button variant="outline" onClick={exportUserSettings}>
+              <Button variant="outline" onClick={() => { exportDataToFile(); closeMobileMenu(); }}>
                 <Download className="mr-2 h-4 w-4" />
-                Экспорт настроек
+                Экспорт в файл
               </Button>
-              <Button variant="destructive" onClick={() => {
-                logout();
-                setMobileMenuOpen(false);
-              }}>
+              <Button variant="outline" onClick={() => { downloadCloudBackup(); closeMobileMenu(); }}>
+                <CloudDownload className="mr-2 h-4 w-4" />
+                Скачать бэкап из облака
+              </Button>
+              <hr className="my-2"/>
+              <Button variant="destructive" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Выйти
               </Button>
@@ -93,26 +115,44 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
     );
   }
 
-  // Desktop view dropdown
+  // Desktop View (Authorized)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-xs">{userInitial}</AvatarFallback>
+        <Button variant="outline" size="icon" className="rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback>{userInitial}</AvatarFallback>
           </Avatar>
-          {user?.username}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem onClick={importUserSettings}>
+         <div className="px-2 py-1.5 text-sm">
+            <p className="font-semibold">Вы вошли как</p>
+            <p className="text-muted-foreground truncate">{user?.email}</p>
+         </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => syncDataToSupabase()}>
+          <CloudUpload className="mr-2 h-4 w-4" />
+          <span>Сохранить в облако</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => loadDataFromSupabase()}>
+          <CloudDownload className="mr-2 h-4 w-4" />
+          <span>Загрузить из облака</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={importDataFromFile}>
           <Upload className="mr-2 h-4 w-4" />
-          <span>Импорт настроек</span>
+          <span>Импорт из файла</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportUserSettings}>
+        <DropdownMenuItem onClick={exportDataToFile}>
           <Download className="mr-2 h-4 w-4" />
-          <span>Экспорт настроек</span>
+          <span>Экспорт в файл</span>
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={downloadCloudBackup}>
+          <CloudDownload className="mr-2 h-4 w-4" />
+          <span>Скачать бэкап из облака</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Выйти</span>

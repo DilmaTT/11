@@ -369,9 +369,9 @@ export const ButtonSettingsDialog = ({
             isMobileMode ? "pt-3.5 mt-1.5" : "pt-4 mt-2"
           )}>
             <Label className="text-right">Размер</Label>
-            <div className="col-span-3 flex items-center gap-4">
+            <div className="col-span-3 grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
-                <Label htmlFor="buttonWidth" className="font-normal">W:</Label>
+                <Label htmlFor="buttonWidth" className="font-normal w-6 text-right">W:</Label>
                 <Input
                   id="buttonWidth"
                   type="number"
@@ -384,7 +384,7 @@ export const ButtonSettingsDialog = ({
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="buttonHeight" className="font-normal">H:</Label>
+                <Label htmlFor="buttonHeight" className="font-normal w-6 text-right">H:</Label>
                 <Input
                   id="buttonHeight"
                   type="number"
@@ -402,9 +402,9 @@ export const ButtonSettingsDialog = ({
           {/* Group for Position (X, Y) */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Позиция</Label>
-            <div className="col-span-3 flex items-center gap-4">
+            <div className="col-span-3 grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
-                <Label htmlFor="buttonX" className="font-normal">X:</Label>
+                <Label htmlFor="buttonX" className="font-normal w-6 text-right">X: </Label>
                 <Input
                   id="buttonX"
                   type="number"
@@ -417,7 +417,7 @@ export const ButtonSettingsDialog = ({
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="buttonY" className="font-normal">Y:</Label>
+                <Label htmlFor="buttonY" className="font-normal w-6 text-right">Y:</Label>
                 <Input
                   id="buttonY"
                   type="number"
@@ -433,32 +433,47 @@ export const ButtonSettingsDialog = ({
           </div>
 
           <div className={cn(
-            "grid grid-cols-4 items-center gap-4 border-t",
+            "grid grid-cols-4 items-start gap-4 border-t",
             isMobileMode ? "pt-3.5 mt-1.5" : "pt-4 mt-2"
           )}>
-            <Label className="text-right col-start-1">Опции</Label>
-            <div className="col-span-3 flex items-center space-x-2">
+            <Label className="text-right col-start-1 pt-2">Опции</Label>
+            <div className="col-span-3 flex flex-col gap-2">
+              <div className="flex items-center space-x-2">
+                  <Checkbox
+                      id="showLegend"
+                      checked={editingButton?.showLegend ?? false}
+                      onCheckedChange={(checked) => {
+                          setEditingButton(prev => prev ? { ...prev, showLegend: !!checked } : null);
+                      }}
+                      disabled={editingButton?.type === 'label' || editingButton?.type === 'exit'}
+                  />
+                  <Label htmlFor="showLegend" className="font-normal">
+                      Показать легенду
+                  </Label>
+                  {editingButton?.showLegend && editingButton?.type === 'normal' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 ml-2"
+                      onClick={onOpenLegendPreview}
+                    >
+                      Предпросмотр
+                    </Button>
+                  )}
+              </div>
+              <div className="flex items-center space-x-2">
                 <Checkbox
-                    id="showLegend"
-                    checked={editingButton?.showLegend ?? false}
+                    id="showRandomizer"
+                    checked={editingButton?.showRandomizer ?? false}
                     onCheckedChange={(checked) => {
-                        setEditingButton(prev => prev ? { ...prev, showLegend: !!checked } : null);
+                        setEditingButton(prev => prev ? { ...prev, showRandomizer: !!checked } : null);
                     }}
                     disabled={editingButton?.type === 'label' || editingButton?.type === 'exit'}
                 />
-                <Label htmlFor="showLegend" className="font-normal">
-                    Показать легенду
+                <Label htmlFor="showRandomizer" className="font-normal">
+                    Показывать рандомайзер
                 </Label>
-                {editingButton?.showLegend && editingButton?.type === 'normal' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 ml-2"
-                    onClick={onOpenLegendPreview}
-                  >
-                    Предпросмотр
-                  </Button>
-                )}
+              </div>
             </div>
           </div>
 

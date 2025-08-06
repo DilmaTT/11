@@ -96,7 +96,8 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
   const { actionButtons } = useRangeContext();
   const [displayedRange, setDisplayedRange] = useState<Range | null>(null);
   const [showMatrixDialog, setShowMatrixDialog] = useState(false);
-  const [activeButton, setActiveButton] = useState<ChartButton | null>(null); // State to store the active button
+  const [activeButton, setActiveButton] = useState<ChartButton | null>(null);
+  const [randomNumber, setRandomNumber] = useState<number | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [dynamicBorderStyle, setDynamicBorderStyle] = useState<React.CSSProperties>({});
 
@@ -105,14 +106,10 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
       setViewportSize({ width: window.innerWidth, height: window.innerHeight });
     };
 
-    if (isMobileMode) {
-      handleResize();
-      window.addEventListener('resize', handleResize);
-    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
 
-    // Universal border style calculation
     try {
-      // This code runs on the client, so `window` and `document` are available.
       const bgHslString = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
       if (!bgHslString) return;
 
@@ -125,18 +122,16 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
 
       if (isNaN(h) || isNaN(s) || isNaN(l)) return;
 
-      // "15% brighter" -> L' = L + (100 - L) * 0.15
       const newL = l + (100 - l) * 0.15;
       const newBorderColor = `hsl(${h} ${s}% ${Math.min(100, newL)}%)`;
 
       setDynamicBorderStyle({
         borderColor: newBorderColor,
-        borderWidth: '1px', // 50% narrower than original 2px
+        borderWidth: '1px',
         borderStyle: 'solid'
       });
     } catch (error) {
       console.error("Could not calculate dynamic border color, falling back.", error);
-      // Fallback style in case of any error
       setDynamicBorderStyle({
         borderColor: 'hsl(var(--border))',
         borderWidth: '1px',
@@ -144,21 +139,30 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
       });
     }
 
-    if (isMobileMode) {
-      return () => window.removeEventListener('resize', handleResize);
-    }
-  }, [isMobileMode]);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleButtonClick = (button: ChartButton) => {
-    if (button.type === 'exit' || button.type === 'label') {
-      onBackToCharts(); // Assuming exit is the only non-range action for now
+    if (button.type === 'label') {
       return;
     }
-
+  
+    if (button.type === 'exit') {
+      onBackToCharts();
+      return;
+    }
+  
     const linkedRange = allRanges.find(range => range.id === button.linkedItem);
     if (linkedRange) {
       setDisplayedRange(linkedRange);
-      setActiveButton(button); // Store the clicked button
+      setActiveButton(button);
+      
+      if (button.showRandomizer) {
+        setRandomNumber(Math.floor(Math.random() * 101));
+      } else {
+        setRandomNumber(null);
+      }
+
       setShowMatrixDialog(true);
     } else {
       alert("Привязанный диапазон не найден.");
@@ -169,9 +173,18 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
     setShowMatrixDialog(false);
     setDisplayedRange(null);
     setActiveButton(null);
+    setRandomNumber(null);
   }
 
-  // Determine which actions are used in the currently displayed range
+  const handleLinkButtonClick = (targetRangeId: string) => {
+    const targetRange = allRanges.find(r => r.id === targetRangeId);
+    if (targetRange) {
+      setDisplayedRange(targetRange);
+    } else {
+      alert('Связанный ренж не найден!');
+    }
+  };
+
   const usedActions = React.useMemo(() => {
     if (!displayedRange) return [];
     
@@ -184,33 +197,41 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
 
   const scale = (isMobileMode && viewportSize.width > 0 && chart.canvasWidth > 0)
     ? Math.min(
-        (viewportSize.width * 0.95) / chart.canvasWidth,
-        (viewportSize.height * 0.95) / chart.canvasHeight
+        viewportSize.width / chart.canvasWidth,
+        viewportSize.height / chart.canvasHeight
       )
     : 1;
+
+  const linkButtonContainerPositionClass = {
+    left: 'justify-start',
+    center: 'justify-center',
+    right: 'justify-end',
+  };
 
   return (
     <>
       <div className={cn(
-        "p-6",
         isMobileMode
-          ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background p-2"
-          : "min-h-screen"
+          ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background"
+          : "p-6 min-h-screen"
       )}>
         <div className={cn(
           isMobileMode ? "w-full h-full flex flex-col items-center justify-center" : "w-full flex justify-center items-start"
         )}>
           <div
-            className="relative bg-card flex items-center justify-center overflow-hidden rounded-lg"
+            className={cn(
+              "relative flex items-center justify-center overflow-hidden",
+              isMobileMode ? "bg-background" : "bg-card rounded-lg"
+            )}
             style={{
               width: chart.canvasWidth,
               height: chart.canvasHeight,
-              ...dynamicBorderStyle,
               ...(isMobileMode ? {
                 transform: `scale(${scale})`,
                 transformOrigin: 'center center',
               } : {
                 flexShrink: 0,
+                ...dynamicBorderStyle
               })
             }}
           >
@@ -252,7 +273,20 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
 
       <CustomDialog isOpen={showMatrixDialog} onClose={handleCloseDialog} isMobileMode={isMobileMode}>
           {displayedRange && (
-            <div>
+            <div className="relative pt-10">
+              {activeButton?.showRandomizer && randomNumber !== null && (
+                <div 
+                  className="absolute top-0 right-0 font-bold z-10 rounded-md"
+                  style={{ 
+                    fontSize: '20px', 
+                    color: 'white', 
+                    backgroundColor: '#0d0e12',
+                    padding: '4px 12px'
+                  }}
+                >
+                  {randomNumber}
+                </div>
+              )}
               <PokerMatrix
                 selectedHands={displayedRange.hands}
                 onHandSelect={() => {}}
@@ -267,6 +301,24 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                   allActionButtons={actionButtons}
                   legendOverrides={activeButton?.legendOverrides}
                 />
+              )}
+              {activeButton?.linkButtons && activeButton.linkButtons.some(b => b.enabled) && (
+                <div className={cn(
+                  "mt-4 flex gap-4",
+                  linkButtonContainerPositionClass[activeButton.linkButtons[0].position]
+                )}>
+                  {activeButton.linkButtons.map((linkButton, index) => (
+                    linkButton.enabled && linkButton.targetRangeId && (
+                      <Button
+                        key={index}
+                        onClick={() => handleLinkButtonClick(linkButton.targetRangeId)}
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold w-20 h-6 px-2 text-xs"
+                      >
+                        {linkButton.text || "Перейти"}
+                      </Button>
+                    )
+                  ))}
+                </div>
               )}
             </div>
           )}

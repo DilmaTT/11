@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, RefObject } from 'react';
-import { ChartButton } from '@/types/chart'; // Import from new types file
+import { ChartButton } from '@/types/chart';
 
 const MIN_BUTTON_DIMENSION = 5;
 
@@ -7,14 +7,39 @@ interface UseChartInteractionsProps {
   buttons: ChartButton[];
   setButtons: React.Dispatch<React.SetStateAction<ChartButton[]>>;
   canvasRef: RefObject<HTMLDivElement>;
+  isMoveMode: boolean;
 }
 
-export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChartInteractionsProps) => {
+export const useChartInteractions = ({ buttons, setButtons, canvasRef, isMoveMode }: UseChartInteractionsProps) => {
   const [activeButtonId, setActiveButtonId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [resizeDirection, setResizeDirection] = useState<string | null>(null);
+
+  // Clear selection when move mode is toggled off
+  useEffect(() => {
+    if (!isMoveMode) {
+      setActiveButtonId(null);
+    }
+  }, [isMoveMode]);
+
+  // Handle deselection by clicking on the canvas background
+  useEffect(() => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const handleCanvasMouseDown = (e: MouseEvent) => {
+      if (e.target === canvasEl) {
+        setActiveButtonId(null);
+      }
+    };
+
+    canvasEl.addEventListener('mousedown', handleCanvasMouseDown);
+    return () => {
+      canvasEl.removeEventListener('mousedown', handleCanvasMouseDown);
+    };
+  }, [canvasRef]);
 
   const getResizeDirection = useCallback((e: React.MouseEvent | React.TouchEvent, button: ChartButton) => {
     const rect = (e.target as HTMLElement).getBoundingClientRect();
@@ -43,7 +68,7 @@ export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChar
     setActiveButtonId(button.id);
 
     const direction = getResizeDirection(e, button);
-    if (direction) {
+    if (!isMoveMode && direction) {
       setIsResizing(true);
       setResizeDirection(direction);
     } else {
@@ -55,7 +80,7 @@ export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChar
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     });
-  }, [getResizeDirection]);
+  }, [getResizeDirection, isMoveMode]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent, button: ChartButton) => {
     if ((e.target as HTMLElement).closest('.settings-icon')) {
@@ -65,7 +90,7 @@ export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChar
     setActiveButtonId(button.id);
 
     const direction = getResizeDirection(e, button);
-    if (direction) {
+    if (!isMoveMode && direction) {
       setIsResizing(true);
       setResizeDirection(direction);
     } else {
@@ -78,7 +103,7 @@ export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChar
       x: touch.clientX - rect.left,
       y: touch.clientY - rect.top,
     });
-  }, [getResizeDirection]);
+  }, [getResizeDirection, isMoveMode]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!activeButtonId || !canvasRef.current) return;
@@ -249,12 +274,20 @@ export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChar
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setIsResizing(false);
-    setActiveButtonId(null);
     setResizeDirection(null);
-  }, []);
+    // In move mode, the selection persists after mouse up.
+    if (!isMoveMode) {
+      setActiveButtonId(null);
+    }
+  }, [isMoveMode]);
 
   const handleButtonMouseMove = useCallback((e: React.MouseEvent, button: ChartButton) => {
     if (isDragging || isResizing) return;
+
+    if (isMoveMode) {
+      (e.currentTarget as HTMLElement).style.cursor = 'grab';
+      return;
+    }
 
     const direction = getResizeDirection(e, button);
     if (direction) {
@@ -262,7 +295,7 @@ export const useChartInteractions = ({ buttons, setButtons, canvasRef }: UseChar
     } else {
       (e.currentTarget as HTMLElement).style.cursor = 'grab';
     }
-  }, [isDragging, isResizing, getResizeDirection]);
+  }, [isDragging, isResizing, getResizeDirection, isMoveMode]);
 
   const handleButtonMouseLeave = useCallback((e: React.MouseEvent) => {
     if (isDragging || isResizing) return;

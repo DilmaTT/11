@@ -3,30 +3,7 @@ import { cn } from "@/lib/utils";
 import React, { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ActionButton } from "@/contexts/RangeContext";
-
-// Poker hand matrix data
-const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
-
-const HANDS = [];
-for (let i = 0; i < RANKS.length; i++) {
-  const row = [];
-  for (let j = 0; j < RANKS.length; j++) {
-    const rank1 = RANKS[i];
-    const rank2 = RANKS[j];
-
-    if (i === j) {
-      // Diagonal: Pairs
-      row.push(`${rank1}${rank1}`);
-    } else if (i < j) {
-      // Upper triangle: Suited hands (e.g., AKs, AQs)
-      row.push(`${rank1}${rank2}s`);
-    } else {
-      // Lower triangle: Offsuit hands (e.g., AKo, AQo)
-      row.push(`${rank2}${rank1}o`); // Note: rank2 then rank1 for offsuit to maintain standard naming (e.g., AKo not KAo)
-    }
-  }
-  HANDS.push(row);
-}
+import { HANDS } from "@/lib/poker-utils";
 
 interface PokerMatrixProps {
   selectedHands: Record<string, string>;
@@ -35,8 +12,7 @@ interface PokerMatrixProps {
   actionButtons: ActionButton[];
   readOnly?: boolean;
   isBackgroundMode?: boolean;
-  sizeVariant?: 'default' | 'editorPreview'; // New prop for sizing
-  initialScale?: number;
+  sizeVariant?: 'default' | 'editorPreview';
 }
 
 const getActionColor = (actionId: string, buttons: ActionButton[]): string => {
@@ -51,13 +27,13 @@ const getActionColor = (actionId: string, buttons: ActionButton[]): string => {
   return '#ffffff'; 
 };
 
-export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionButtons, readOnly = false, isBackgroundMode = false, sizeVariant = 'default', initialScale }: PokerMatrixProps) => {
+export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionButtons, readOnly = false, isBackgroundMode = false, sizeVariant = 'default' }: PokerMatrixProps) => {
   const isMobile = useIsMobile();
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'select' | 'deselect' | null>(null);
   const lastHandSelectedDuringDrag = useRef<string | null>(null);
-  // Initialize zoomLevel. Use initialScale if provided, otherwise default.
-  const [zoomLevel, setZoomLevel] = useState<number>(initialScale ?? (isMobile ? 1 : 0.85));
+  const touchStarted = useRef(false);
+  const hasDragged = useRef(false); // To distinguish a tap from a drag
 
   // If in background mode, disable dragging and force readOnly
   useEffect(() => {
@@ -67,45 +43,59 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
     }
   }, [isBackgroundMode]);
 
-  const handleDragEnd = () => {
-    setIsDragging(false);
-    setDragMode(null);
-  };
-
   useEffect(() => {
-    window.addEventListener('mouseup', handleDragEnd);
-    window.addEventListener('touchend', handleDragEnd);
-    window.addEventListener('touchcancel', handleDragEnd);
+    const enhancedDragEnd = () => {
+      setIsDragging(false);
+      setDragMode(null);
+      touchStarted.current = false;
+    };
+
+    window.addEventListener('mouseup', enhancedDragEnd);
+    window.addEventListener('touchend', enhancedDragEnd);
+    window.addEventListener('touchcancel', enhancedDragEnd);
 
     return () => {
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchend', handleDragEnd);
-      window.removeEventListener('touchcancel', handleDragEnd);
+      window.removeEventListener('mouseup', enhancedDragEnd);
+      window.removeEventListener('touchend', enhancedDragEnd);
+      window.removeEventListener('touchcancel', enhancedDragEnd);
     };
   }, []);
 
   const handlePointerDown = (hand: string) => {
     if (readOnly || isBackgroundMode) return;
     
-    lastHandSelectedDuringDrag.current = null;
+    hasDragged.current = false; // Reset for each new interaction
+    lastHandSelectedDuringDrag.current = hand;
     setIsDragging(true);
 
     const currentHandAction = selectedHands[hand];
     const mode = currentHandAction === activeAction ? 'deselect' : 'select';
     setDragMode(mode);
 
-    // Apply action immediately on pointer down to select the first cell
+    // Immediately select/deselect the initial hand
     onHandSelect(hand, mode);
-    lastHandSelectedDuringDrag.current = hand;
+  };
+
+  const handleTouchStart = (hand: string) => {
+    touchStarted.current = true;
+    handlePointerDown(hand);
+  };
+
+  const handleMouseDown = (hand: string) => {
+    if (touchStarted.current) {
+      return;
+    }
+    handlePointerDown(hand);
   };
 
   const handlePointerEnter = (hand: string) => {
     if (readOnly || isBackgroundMode || !isDragging || !dragMode) return;
     
-    // Select subsequent cells only if they are different from the last one
+    // Only select if the hand is different from the last one processed during this drag
     if (lastHandSelectedDuringDrag.current !== hand) {
-      onHandSelect(hand, dragMode);
-      lastHandSelectedDuringDrag.current = hand;
+        hasDragged.current = true; // Confirm a drag has occurred
+        onHandSelect(hand, dragMode);
+        lastHandSelectedDuringDrag.current = hand;
     }
   };
 
@@ -119,6 +109,48 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
     if (element instanceof HTMLElement && element.dataset.hand) {
       const hand = element.dataset.hand;
       handlePointerEnter(hand);
+    }
+  };
+
+  const handleClick = (hand: string) => {
+    if (readOnly || isBackgroundMode) return;
+
+    // If no drag occurred, this is a tap.
+    // The initial selection for a drag is handled in handlePointerDown,
+    // so we only need to act here if it was a pure click/tap.
+    if (!hasDragged.current) {
+        // If it was a pure tap, and handlePointerDown already selected it,
+        // we need to ensure it's not double-processed or toggled incorrectly.
+        // The current logic in handlePointerDown already performs the toggle.
+        // So, for a pure click, we don't need to do anything here as handlePointerDown
+        // already handled the selection.
+        // This `handleClick` will only be triggered if the user clicks and releases
+        // without any `mousemove` or `touchmove` events that would set `hasDragged.current = true`.
+        // Since `handlePointerDown` already toggles the state, this `handleClick`
+        // should effectively do nothing for a pure tap, as the state is already set.
+        // However, if `handlePointerDown` only *starts* the drag and `onHandSelect`
+        // is meant to be called only once per interaction (either tap or drag),
+        // then the current `handleClick` logic is correct for a tap.
+        // Given the change to `handlePointerDown` to immediately select,
+        // this `handleClick` might become redundant for simple taps.
+        // Let's keep it as is for now, as `onHandSelect` is idempotent for toggling.
+        // If `onHandSelect` is called twice for a single tap, it will just toggle back.
+        // The fix is to ensure `handlePointerDown` makes the initial selection.
+        // The `handleClick` is primarily for cases where `onHandSelect` wasn't called by `handlePointerDown`
+        // or if it needs to re-evaluate the state after a very quick tap.
+        // With the new `handlePointerDown` logic, a pure tap will call `onHandSelect` once.
+        // If `handleClick` is also called, it will call `onHandSelect` again, effectively undoing the first action.
+        // Therefore, we should prevent `handleClick` from acting if `handlePointerDown` already did.
+        // The `hasDragged.current` check is key here. If `hasDragged.current` is false, it means
+        // no drag occurred. `handlePointerDown` already made the initial selection.
+        // So, for a pure tap, we should *not* call `onHandSelect` again in `handleClick`.
+        // The `handleClick` should only be relevant if `handlePointerDown` *didn't* make the selection,
+        // which is no longer the case.
+        // So, we can remove the `onHandSelect` call from `handleClick` entirely.
+        // The `handlePointerDown` will handle the initial selection for both taps and drags.
+        // `handlePointerEnter` will handle subsequent selections during a drag.
+        // `handleClick` is then only for the "click" event, which is redundant if `onPointerDown` already handled it.
+        // Let's remove the `onHandSelect` call from `handleClick`.
     }
   };
 
@@ -199,9 +231,10 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
               getHandColorClass(hand)
             )}
             style={getHandStyle(hand)}
-            onMouseDown={() => handlePointerDown(hand)}
+            onClick={() => handleClick(hand)}
+            onMouseDown={() => handleMouseDown(hand)}
             onMouseEnter={() => handlePointerEnter(hand)}
-            onTouchStart={() => handlePointerDown(hand)}
+            onTouchStart={() => handleTouchStart(hand)}
             // The disabled attribute is removed to prevent dimming
           >
             {hand}
@@ -213,22 +246,7 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
 
   return (
     <div className={parentContainerClasses}>
-      {isMobile || isBackgroundMode ? ( // Render directly for mobile or background mode
-        matrixContent
-      ) : (
-        // Desktop: Render with scale wrapper and zoom buttons
-        <div
-          className="relative w-full"
-          style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
-        >
-          {matrixContent}
-          <div className="absolute -bottom-6 left-0 flex gap-1">
-            <Button variant="outline" size="sm" className="h-5 w-10 text-xs" onClick={() => setZoomLevel(0.85)}>x1</Button>
-            <Button variant="outline" size="sm" className="h-5 w-10 text-xs" onClick={() => setZoomLevel(1.0)}>x1.2</Button>
-            <Button variant="outline" size="sm" className="h-5 w-10 text-xs" onClick={() => setZoomLevel(1.2)}>x1.5</Button>
-          </div>
-        </div>
-      )}
+      {matrixContent}
     </div>
   );
 };

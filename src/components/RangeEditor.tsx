@@ -113,7 +113,6 @@ const FolderRangeTreeContent = ({
                   "h-6 text-sm border-none bg-transparent p-0 focus:bg-background",
                   isMobileMode && "max-w-[50vw]"
                 )}
-                maxLength={isMobileMode ? 12 : 8}
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
               />
@@ -197,7 +196,6 @@ const FolderRangeTreeContent = ({
                             }
                           }}
                           className="h-5 text-xs border-none bg-transparent p-0 focus:bg-background"
-                          maxLength={isMobileMode ? 12 : 8}
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />

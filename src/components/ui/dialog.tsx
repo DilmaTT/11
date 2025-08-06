@@ -29,29 +29,27 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
   mobileFullscreen?: boolean;
-  showOverlay?: boolean; // Add this prop
+  showOverlay?: boolean;
 }
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, mobileFullscreen, showOverlay = true, ...props }, ref) => ( // Default to true
+>(({ className, children, mobileFullscreen, showOverlay = true, ...props }, ref) => (
   <DialogPortal>
     {showOverlay && <DialogOverlay />}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 grid w-full gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        // Universal centering for all screen sizes by default
-        "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
-        // Desktop specific styles (sm and up)
-        "sm:max-w-lg sm:rounded-lg",
-        // Animations for desktop
-        "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        // Mobile fullscreen override
+        "fixed z-50 grid w-full gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         mobileFullscreen
           ? "inset-0 h-full w-full rounded-none border-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
-          : "",
+          : [
+              "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
+              "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+              "sm:max-w-lg sm:rounded-lg",
+            ],
         className
       )}
       {...props}

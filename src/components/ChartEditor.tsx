@@ -27,7 +27,8 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
   const [canvasHeight, setCanvasHeight] = useState(chart.canvasHeight || 500);
   const [isButtonModalOpen, setIsButtonModalOpen] = useState(false);
   const [editingButton, setEditingButton] = useState<ChartButton | null>(null);
-  const [isLegendPreviewOpen, setIsLegendPreview] = useState(false); 
+  const [isLegendPreviewOpen, setIsLegendPreview] = useState(false);
+  const [isMoveMode, setIsMoveMode] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +41,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     handleTouchStart,
     handleButtonMouseMove,
     handleButtonMouseLeave,
-  } = useChartInteractions({ buttons, setButtons, canvasRef });
+  } = useChartInteractions({ buttons, setButtons, canvasRef, isMoveMode });
 
   useEffect(() => {
     setChartName(chart.name);
@@ -81,6 +82,47 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     });
   }, [canvasWidth, canvasHeight]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isMoveMode || !activeButtonId) return;
+
+      const selectedButton = buttons.find(b => b.id === activeButtonId);
+      if (!selectedButton) return;
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
+
+      let dx = 0;
+      let dy = 0;
+      const step = e.shiftKey ? 10 : 1;
+
+      switch (e.key) {
+        case 'ArrowUp': dy = -step; break;
+        case 'ArrowDown': dy = step; break;
+        case 'ArrowLeft': dx = -step; break;
+        case 'ArrowRight': dx = step; break;
+        default: return;
+      }
+
+      setButtons(prevButtons =>
+        prevButtons.map(btn => {
+          if (btn.id === activeButtonId) {
+            const newX = Math.max(0, Math.min(btn.x + dx, canvasWidth - btn.width));
+            const newY = Math.max(0, Math.min(btn.y + dy, canvasHeight - btn.height));
+            return { ...btn, x: newX, y: newY };
+          }
+          return btn;
+        })
+      );
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoveMode, activeButtonId, buttons, setButtons, canvasWidth, canvasHeight]);
+
   const handleAddButton = () => {
     const newButton: ChartButton = {
       id: String(Date.now()),
@@ -95,8 +137,13 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       isFontAdaptive: true,
       fontSize: 16,
       fontColor: 'white',
-      showLegend: false,
+      showLegend: true,
+      showRandomizer: false,
       legendOverrides: {},
+      linkButtons: [
+        { enabled: false, text: '', position: 'center', targetRangeId: '' },
+        { enabled: false, text: '', position: 'center', targetRangeId: '' }
+      ]
     };
     setButtons((prev) => [...prev, newButton]);
     setEditingButton(newButton);
@@ -129,11 +176,41 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
 
   const duplicateCurrentButton = () => {
     if (editingButton) {
+      const GAP = 0.1;
+      let newX: number;
+      let newY: number;
+
+      // Proposed horizontal position
+      const horizontalX = editingButton.x + editingButton.width + GAP;
+      
+      // Check if horizontal placement is possible
+      if (horizontalX + editingButton.width <= canvasWidth) {
+        newX = horizontalX;
+        newY = editingButton.y;
+      } else {
+        // Proposed vertical position
+        const verticalY = editingButton.y + editingButton.height + GAP;
+        
+        // Check if vertical placement is possible
+        if (verticalY + editingButton.height <= canvasHeight) {
+          newX = editingButton.x;
+          newY = verticalY;
+        } else {
+          // Fallback: place slightly offset from original, ensuring it's in bounds
+          newX = Math.min(editingButton.x + 10, canvasWidth - editingButton.width);
+          newY = Math.min(editingButton.y + 10, canvasHeight - editingButton.height);
+        }
+      }
+
+      // Final boundary check to be safe
+      newX = Math.max(0, newX);
+      newY = Math.max(0, newY);
+
       const newButton: ChartButton = {
         ...editingButton,
         id: String(Date.now()), // New unique ID
-        x: editingButton.x + 10, // Offset by 10px right
-        y: editingButton.y + 10, // Offset by 10px down
+        x: newX,
+        y: newY,
       };
       setButtons((prev) => [...prev, newButton]);
       setIsButtonModalOpen(false);
@@ -189,12 +266,20 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     }
   };
 
-  const handleSaveLegendOverrides = (newOverrides: Record<string, string>) => {
+  const handleSaveLegendAndLinkConfig = (newConfig: { overrides: Record<string, string>, linkButtonsConfig?: ChartButton['linkButtons'] }) => {
     setEditingButton(prev => {
       if (!prev) return null;
-      return { ...prev, legendOverrides: newOverrides };
+      return { 
+        ...prev, 
+        legendOverrides: newConfig.overrides,
+        linkButtons: newConfig.linkButtonsConfig
+      };
     });
     setIsLegendPreview(false); 
+  };
+
+  const toggleMoveMode = () => {
+    setIsMoveMode(prev => !prev);
   };
 
   const linkedRangeForPreview = editingButton?.linkedItem ? allRanges.find(r => r.id === editingButton.linkedItem) : null;
@@ -225,6 +310,8 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
           onMaximizeCanvas={handleMaximizeCanvas}
           onDimensionChange={handleDimensionChange}
           onDimensionBlur={handleDimensionBlur}
+          isMoveMode={isMoveMode}
+          onToggleMoveMode={toggleMoveMode}
         />
         
         <ChartCanvas
@@ -260,8 +347,9 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
           onOpenChange={setIsLegendPreview} 
           linkedRange={linkedRangeForPreview}
           actionButtons={actionButtons}
-          initialOverrides={editingButton?.legendOverrides || {}}
-          onSave={handleSaveLegendOverrides}
+          editingButton={editingButton}
+          onSave={handleSaveLegendAndLinkConfig}
+          folders={folders}
         />
       </div>
     </div>

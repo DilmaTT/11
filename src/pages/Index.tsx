@@ -11,8 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Monitor, Smartphone } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRangeContext } from "@/contexts/RangeContext";
+import { useAuth } from "@/contexts/AuthContext"; // Импортируем useAuth
 
 const Index = () => {
+  console.log("Index.tsx rendered");
+
   const { folders } = useRangeContext();
   const allRanges = folders.flatMap(folder => folder.ranges);
 
@@ -103,6 +106,7 @@ const Index = () => {
   };
 
   const renderSection = () => {
+    console.log("Index.tsx: renderSection called. activeSection:", activeSection);
     switch (activeSection) {
       case 'editor':
         return <RangeEditor isMobileMode={isMobileLayout} />;
@@ -170,8 +174,33 @@ const Index = () => {
     </div>
   );
 
+  // Добавляем лог для проверки состояния загрузки AuthContext
+  const { loading: authLoading } = useAuth();
+  console.log("Index.tsx: AuthContext loading state:", authLoading);
+  console.log("Index.tsx: isFullScreenViewer:", isFullScreenViewer);
+  console.log("Index.tsx: isMobileLayout:", isMobileLayout);
+  console.log("Index.tsx: activeSection:", activeSection);
+  console.log("Index.tsx: folders (from RangeContext):", folders);
+  console.log("Index.tsx: charts (local state):", charts);
+
+
+  if (authLoading) {
+    console.log("Index.tsx: AuthContext is still loading, rendering null.");
+    return null; // Или можно вернуть спиннер загрузки
+  }
+
   return isFullScreenViewer ? (
-    renderSection()
+    <React.Fragment>
+      {/* Добавляем try-catch вокруг renderSection для полноэкранного режима */}
+      {(() => {
+        try {
+          return renderSection();
+        } catch (e) {
+          console.error("Index.tsx: Error rendering full screen section:", e);
+          return <div className="text-red-500 p-4">Ошибка загрузки полноэкранного режима: {e instanceof Error ? e.message : String(e)}</div>;
+        }
+      })()}
+    </React.Fragment>
   ) : (
     <div className="min-h-screen bg-background">
       {!isMobileLayout ? (
@@ -193,7 +222,17 @@ const Index = () => {
               </div>
             </div>
           </div>
-          {renderSection()}
+          <React.Fragment>
+            {/* Добавляем try-catch вокруг renderSection для десктопного режима */}
+            {(() => {
+              try {
+                return renderSection();
+              } catch (e) {
+                console.error("Index.tsx: Error rendering desktop section:", e);
+                return <div className="text-red-500 p-4">Ошибка загрузки десктопного режима: {e instanceof Error ? e.message : String(e)}</div>;
+              }
+            })()}
+          </React.Fragment>
         </>
       ) : (
         // Mobile Layout
@@ -209,7 +248,17 @@ const Index = () => {
             </div>
           </div>
           <div className="flex-1 flex flex-col">
-            {renderSection()}
+            <React.Fragment>
+              {/* Добавляем try-catch вокруг renderSection для мобильного режима */}
+              {(() => {
+                try {
+                  return renderSection();
+                } catch (e) {
+                  console.error("Index.tsx: Error rendering mobile section:", e);
+                  return <div className="text-red-500 p-4">Ошибка загрузки мобильного режима: {e instanceof Error ? e.message : String(e)}</div>;
+                }
+              })()}
+            </React.Fragment>
           </div>
         </div>
       )}

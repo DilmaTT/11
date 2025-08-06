@@ -1,48 +1,68 @@
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PokerCardProps {
   hand: string;
   className?: string;
+  fixedCards?: Array<{ rank: string, suit: string }>;
 }
 
-export const PokerCard = ({ hand, className }: PokerCardProps) => {
+const SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
+
+export const PokerCard = ({ hand, className, fixedCards }: PokerCardProps) => {
+  const isMobile = useIsMobile();
+
   // Parse hand like "AA", "AKs", "72o" etc.
   const getCardInfo = (hand: string) => {
-    if (hand.length === 2) {
+    const getRandomSuit = () => SUITS[Math.floor(Math.random() * SUITS.length)];
+    const getTwoDifferentRandomSuits = () => {
+      let suit1 = getRandomSuit();
+      let suit2 = getRandomSuit();
+      while (suit1 === suit2) {
+        suit2 = getRandomSuit();
+      }
+      return [suit1, suit2];
+    };
+
+    if (hand.length === 2 && hand[0] === hand[1]) {
       // Pocket pairs like AA, KK, etc.
+      const [suit1, suit2] = getTwoDifferentRandomSuits();
       return [
-        { rank: hand[0], suit: 'spades' },
-        { rank: hand[1], suit: 'hearts' }
+        { rank: hand[0], suit: suit1 },
+        { rank: hand[1], suit: suit2 }
       ];
     } else if (hand.length === 3) {
       // Suited or offsuit like AKs, AKo
       const suited = hand[2] === 's';
+      if (suited) {
+        const commonSuit = getRandomSuit();
+        return [
+          { rank: hand[0], suit: commonSuit },
+          { rank: hand[1], suit: commonSuit }
+        ];
+      } else { // Offsuit
+        const [suit1, suit2] = getTwoDifferentRandomSuits();
+        return [
+          { rank: hand[0], suit: suit1 },
+          { rank: hand[1], suit: suit2 }
+        ];
+      }
+    } else if (hand.length === 2) { // Non-paired offsuit like AK, QJ (implicitly offsuit if no 's' or 'o')
+      const [suit1, suit2] = getTwoDifferentRandomSuits();
       return [
-        { rank: hand[0], suit: suited ? 'spades' : 'spades' },
-        { rank: hand[1], suit: suited ? 'spades' : 'hearts' }
+        { rank: hand[0], suit: suit1 },
+        { rank: hand[1], suit: suit2 }
       ];
     }
+    // Fallback for invalid hand format
     return [
       { rank: 'A', suit: 'spades' },
       { rank: 'A', suit: 'hearts' }
     ];
   };
 
-  const cards = getCardInfo(hand);
-
-  const getSuitStyles = (suit: string) => {
-    switch (suit) {
-      case 'hearts':
-        return 'bg-red-600 text-white';
-      case 'diamonds':
-        return 'bg-blue-600 text-white';
-      case 'clubs':
-        return 'bg-green-600 text-white';
-      case 'spades':
-      default:
-        return 'bg-gray-500 text-white';
-    }
-  };
+  // Use fixedCards if provided, otherwise generate based on the hand string
+  const cards = fixedCards || getCardInfo(hand);
 
   const getSuitSymbol = (suit: string) => {
     switch (suit) {
@@ -58,8 +78,22 @@ export const PokerCard = ({ hand, className }: PokerCardProps) => {
     }
   };
 
+  const getCardColor = (suit: string) => {
+    switch (suit) {
+      case 'hearts':
+        return 'bg-red-700';
+      case 'diamonds':
+        return 'bg-blue-700';
+      case 'clubs':
+        return 'bg-green-700';
+      case 'spades':
+      default:
+        return 'bg-gray-800';
+    }
+  };
+
+  // Display 'T' for Ten. The hand data uses 'T'.
   const formatRank = (rank: string) => {
-    if (rank === 'T') return '10';
     return rank;
   };
 
@@ -69,16 +103,22 @@ export const PokerCard = ({ hand, className }: PokerCardProps) => {
         <div
           key={index}
           className={cn(
-            "rounded-lg border-2 border-gray-300 shadow-lg w-12 h-16 sm:w-16 sm:h-20 flex items-center justify-center relative",
-            getSuitStyles(card.suit)
+            getCardColor(card.suit),
+            "text-white rounded-md shadow-lg w-12 h-16 sm:w-16 sm:h-20 relative font-bold flex items-center justify-center"
           )}
         >
-          {/* Suit symbol in top-left corner */}
-          <div className="absolute top-1 left-1 text-white text-sm sm:text-lg font-bold opacity-90">
-            {getSuitSymbol(card.suit)}
+          {/* Top-left corner info */}
+          <div className="absolute top-[0.15rem] left-1.5 flex flex-col items-center leading-none">
+            <span className={cn(
+              isMobile ? "text-[13.863px] translate-y-[10%]" : "text-[14.292px] sm:text-[17.86px] translate-y-[20%]"
+            )}>{formatRank(card.rank)}</span>
+            <span className={cn(
+              isMobile ? "text-[11.647px] -mt-1.5 translate-y-[75%]" : "text-[10.719px] sm:text-[13.89px] -mt-1.5 translate-y-[65%]"
+            )}>{getSuitSymbol(card.suit)}</span>
           </div>
           
-          <div className="text-2xl sm:text-4xl font-bold">
+          {/* Central large rank */}
+          <div className="text-4xl sm:text-5xl translate-x-[15%] translate-y-[20%]">
             {formatRank(card.rank)}
           </div>
         </div>

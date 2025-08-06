@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Play, Trash2, BarChart2 } from "lucide-react";
 import { CreateTrainingDialog } from "./CreateTrainingDialog";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,18 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { TrainingSession } from "./TrainingSession";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 interface TrainingProps {
@@ -28,7 +39,10 @@ interface SessionStat {
   correctAnswers: number;
 }
 
-export const Training = ({ isMobileMode = false }: TrainingProps) => {
+export const Training = ({ isMobileMode: propIsMobileMode = false }: TrainingProps) => {
+  const isMobileHook = useIsMobile();
+  const isMobileMode = propIsMobileMode || isMobileHook;
+
   const [trainings, setTrainings] = useState(() => {
     const saved = localStorage.getItem('training-sessions');
     try {
@@ -39,6 +53,16 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
       return [];
     }
   });
+  const [folders] = useState(() => {
+    const saved = localStorage.getItem('poker-ranges-folders');
+    try {
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Failed to parse folders from localStorage", e);
+      return [];
+    }
+  });
   const [selectedTraining, setSelectedTraining] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [activeTraining, setActiveTraining] = useState<any>(null);
@@ -46,7 +70,15 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
   const [statsVersion, setStatsVersion] = useState(0);
   const [statsModalTrainingId, setStatsModalTrainingId] = useState<string | null>(null);
   const [modalStats, setModalStats] = useState<SessionStat[]>([]);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const statsModalTraining = trainings.find(t => t.id === statsModalTrainingId);
+
+  // Auto-select the first training in desktop mode if none is selected
+  useEffect(() => {
+    if (!isMobileMode && trainings.length > 0 && !selectedTraining) {
+      setSelectedTraining(trainings[0].id);
+    }
+  }, [isMobileMode, trainings, selectedTraining]);
 
   // Save trainings to localStorage when they change
   useEffect(() => {
@@ -106,20 +138,28 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
   };
 
   const getTrainingSubtypeText = (training: any) => {
-    if (!training.subtype) return null;
-    if (training.subtype === 'all-hands') return 'Все руки';
-    if (training.subtype === 'border-check') {
-      // Handle old data that might not have this property
-      if (training.borderExpansionLevel === undefined) {
-        return 'Граница ренжа (+0)';
+    if (training.type === 'classic') {
+      if (!training.subtype) return null;
+      if (training.subtype === 'all-hands') return 'Все руки';
+      if (training.subtype === 'border-check') {
+        // Handle old data that might not have this property
+        if (training.borderExpansionLevel === undefined) {
+          return 'Граница ренжа (+0)';
+        }
+        return `Граница ренжа (+${training.borderExpansionLevel})`;
       }
-      return `Граница ренжа (+${training.borderExpansionLevel})`;
+    } else if (training.type === 'border-repeat') {
+      // Handle old data that might not have this property
+      if (training.rangeSelectionOrder === 'random') {
+        return 'Случайный порядок';
+      }
+      return 'По порядку'; // Default for old data and 'sequential'
     }
     return null;
   };
 
   const handleCreateTraining = (training: any) => {
-    setTrainings(prev => [...prev, training]);
+    setTrainings(prev => [training, ...prev]); // Place new training at the top
   };
 
   const handleDeleteTraining = (trainingId: string) => {
@@ -132,6 +172,13 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
     const remainingStats = allStats.filter((stat: SessionStat) => stat.trainingId !== trainingId);
     localStorage.setItem('training-statistics', JSON.stringify(remainingStats));
     setStatsVersion(v => v + 1); // force refresh
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteCandidateId) {
+      handleDeleteTraining(deleteCandidateId);
+      setDeleteCandidateId(null);
+    }
   };
 
   const handleStartTraining = (trainingId: string) => {
@@ -208,12 +255,12 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
     <>
       <div className={cn(
         "bg-background",
-        isMobileMode ? "flex flex-col" : "flex h-screen"
+        isMobileMode ? "flex flex-col h-full" : "flex h-screen"
       )}>
         {/* Sidebar */}
         <div className={cn(
           "bg-card p-4 space-y-4",
-          isMobileMode ? "order-2" : "w-80 border-r"
+          isMobileMode ? "order-2 flex-1 flex flex-col" : "w-80 border-r"
         )}>
           <div>
             <h2 className="text-lg font-semibold">Тренировки</h2>
@@ -221,7 +268,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
           
           <div className={cn(
             "space-y-2 overflow-y-auto",
-            isMobileMode ? "max-h-64" : "flex-1"
+            isMobileMode ? "flex-1" : "flex-1"
           )}>
             <h3 className="text-sm font-medium text-muted-foreground mb-2">Созданные тренировки</h3>
             {trainings.length === 0 ? (
@@ -241,19 +288,17 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
                     key={training.id} 
                     className={cn(
                       'cursor-pointer transition-all duration-300',
-                      isMobileMode ? 'py-1 px-2' : 'p-3',
+                      isMobileMode ? 'py-1 px-2' : (isSelected ? 'p-3' : 'py-1 px-3'), // Changed py-2 to py-1 for desktop unselected
                       isSelected ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
                     )}
                     onClick={() => setSelectedTraining(prev => prev === training.id ? null : training.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1 overflow-hidden">
-                        <h4 className="font-medium truncate">{training.name}</h4>
+                        <h4 className="font-medium truncate my-0">{training.name}</h4>
                         <div className={cn(
-                          "transition-all duration-300 ease-in-out",
-                          isMobileMode
-                            ? (isSelected ? "max-h-40 opacity-100 mt-1" : "max-h-0 opacity-0")
-                            : "max-h-40 opacity-100 mt-1" // Always visible on desktop
+                          "transition-all duration-300 ease-in-out overflow-hidden",
+                          isSelected ? "max-h-40 opacity-100 mt-1" : "max-h-0 opacity-0" // Changed condition here
                         )}>
                           <div className="text-xs text-muted-foreground">
                             {training.type === 'classic' ? 'Классическая' : 'Повторение границ'}
@@ -299,7 +344,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
                           className={isMobileMode ? "h-6 px-1" : ""}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteTraining(training.id);
+                            setDeleteCandidateId(training.id);
                           }}
                         >
                           <Trash2 className={cn(isMobileMode ? "h-3.5 w-3.5" : "h-4 w-4")} />
@@ -340,21 +385,30 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
                     const stats = getTrainingStats(training.id);
                     const subtypeText = getTrainingSubtypeText(training);
                     
+                    const folder = folders.find(f => f.id === training.folderId);
+                    const folderName = folder ? folder.name : null;
+                    const rangeNames = training.rangeIds?.map(rangeId => {
+                        const r = folder?.ranges.find(r => r.id === rangeId);
+                        return r ? r.name : null;
+                    }).filter(Boolean).join(', ');
+
                     return (
-                      <div className="space-y-6">
-                        <div className="text-center">
-                          <h1 className={cn(
-                            "font-bold mb-2",
-                            isMobileMode ? "text-xl" : "text-2xl"
-                          )}>{training.name}</h1>
-                          <p className={cn(
-                            "text-muted-foreground",
-                            isMobileMode && "text-sm"
-                          )}>
-                            {training.type === 'classic' ? 'Классическая тренировка' : 'Тренировка повторения границ'}
-                            {subtypeText && ` • ${subtypeText}`}
-                          </p>
-                        </div>
+                      <div className="space-y-4">
+                        <Card>
+                          <CardHeader className="p-2">
+                            <CardTitle className="text-center text-lg">{training.name}</CardTitle>
+                            <CardDescription className="text-center text-xs">
+                              {training.type === 'classic' ? 'Классическая тренировка' : 'Тренировка повторения границ'}
+                              {subtypeText && ` • ${subtypeText}`}
+                            </CardDescription>
+                            {(folderName || rangeNames) && (
+                              <div className="text-xs text-muted-foreground text-center pt-1 border-t mt-1">
+                                {folderName && <p><strong>Папка:</strong> {folderName}</p>}
+                                {rangeNames && <p className="truncate" title={rangeNames}><strong>Ренжи:</strong> {rangeNames}</p>}
+                              </div>
+                            )}
+                          </CardHeader>
+                        </Card>
 
                         {/* Training Stats */}
                         {stats ? (
@@ -468,7 +522,7 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
           <DialogContent mobileFullscreen className="flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>{statsModalTraining?.name}</DialogTitle>
-              <DialogDescription>История сессий</DialogDescription>
+              <DialogDesc>История сессий</DialogDesc>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto -mx-6 px-6">
               {modalStats.length > 0 ? (
@@ -513,6 +567,26 @@ export const Training = ({ isMobileMode = false }: TrainingProps) => {
           </DialogContent>
         </Dialog>
       )}
+
+      <AlertDialog open={!!deleteCandidateId} onOpenChange={(isOpen) => { if (!isOpen) setDeleteCandidateId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Это действие невозможно отменить. Это приведет к необратимому удалению тренировки и всей связанной с ней статистики.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className={buttonVariants({ variant: "destructive" })}
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

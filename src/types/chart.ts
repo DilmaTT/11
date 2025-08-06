@@ -15,7 +15,14 @@ export interface ChartButton {
   fontSize: number;
   fontColor: 'white' | 'black';
   showLegend: boolean;
+  showRandomizer?: boolean;
   legendOverrides: Record<string, string>; // Key: actionId, Value: new name
+  linkButtons?: Array<{
+    enabled: boolean;
+    text: string;
+    position: 'left' | 'center' | 'right'; // Position now applies to the button group
+    targetRangeId: string;
+  }>;
 }
 
 /**

@@ -5,6 +5,8 @@ import App from './App.tsx'
 import './index.css'
 import React from 'react'; // Import React
 
+console.log("main.tsx executed"); // <-- Добавлено
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>

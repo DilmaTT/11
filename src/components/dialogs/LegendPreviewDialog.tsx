@@ -9,9 +9,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PokerMatrix } from "@/components/PokerMatrix";
-import { StoredRange } from '@/types/range';
+import { StoredRange, Folder } from '@/types/range';
 import { ActionButton as ActionButtonType } from "@/contexts/RangeContext";
+import { ChartButton } from '@/types/chart';
+import { Separator } from '../ui/separator';
 
 // Helper function to get the color for a simple action
 const getActionColor = (actionId: string, allButtons: ActionButtonType[]): string => {
@@ -38,30 +48,131 @@ const getActionButtonStyle = (button: ActionButtonType, allButtons: ActionButton
   return {};
 };
 
+type LinkButtonConfig = NonNullable<ChartButton['linkButtons']>[0];
+
 interface LegendPreviewDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   linkedRange: StoredRange | null | undefined;
   actionButtons: ActionButtonType[];
-  initialOverrides: Record<string, string>;
-  onSave: (newOverrides: Record<string, string>) => void;
+  editingButton: ChartButton | null;
+  onSave: (newConfig: { overrides: Record<string, string>, linkButtonsConfig?: ChartButton['linkButtons'] }) => void;
+  folders: Folder[];
 }
+
+const LinkButtonEditor = ({
+  config,
+  onConfigChange,
+  folders,
+  buttonIndex
+}: {
+  config: LinkButtonConfig;
+  onConfigChange: (newConfig: LinkButtonConfig) => void;
+  folders: Folder[];
+  buttonIndex: number;
+}) => {
+  const [selectedFolderId, setSelectedFolderId] = useState('');
+
+  useEffect(() => {
+    if (config.targetRangeId) {
+      const folder = folders.find(f => f.ranges.some(r => r.id === config.targetRangeId));
+      setSelectedFolderId(folder?.id || '');
+    } else if (folders.length > 0) {
+      setSelectedFolderId(folders[0].id);
+    }
+  }, [config.targetRangeId, folders]);
+
+  const rangesInSelectedFolder = useMemo(() => {
+    const folder = folders.find(f => f.id === selectedFolderId);
+    return folder ? folder.ranges : [];
+  }, [selectedFolderId, folders]);
+
+  const handleFolderChange = (folderId: string) => {
+    setSelectedFolderId(folderId);
+    const firstRangeId = folders.find(f => f.id === folderId)?.ranges[0]?.id || '';
+    onConfigChange({ ...config, targetRangeId: firstRangeId });
+  };
+
+  return (
+    <div className="space-y-4 pl-6">
+      <div>
+        <Label htmlFor={`link-button-text-${buttonIndex}`}>Текст на кнопке</Label>
+        <Input
+          id={`link-button-text-${buttonIndex}`}
+          value={config.text}
+          onChange={(e) => onConfigChange({ ...config, text: e.target.value })}
+          placeholder="Напр. vs 3-bet"
+        />
+      </div>
+      {buttonIndex === 0 && (
+        <div>
+          <Label htmlFor="link-button-position">Расположение группы кнопок</Label>
+          <Select
+            value={config.position}
+            onValueChange={(value: 'left' | 'center' | 'right') => onConfigChange({ ...config, position: value })}
+          >
+            <SelectTrigger id="link-button-position">
+              <SelectValue placeholder="Выберите расположение" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">Слева</SelectItem>
+              <SelectItem value="center">По центру</SelectItem>
+              <SelectItem value="right">Справа</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div>
+        <Label>Целевой ренж</Label>
+        <div className="flex gap-2">
+          <Select value={selectedFolderId} onValueChange={handleFolderChange}>
+            <SelectTrigger><SelectValue placeholder="Выберите папку" /></SelectTrigger>
+            <SelectContent>
+              {folders.map(folder => (
+                <SelectItem key={folder.id} value={folder.id}>{folder.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={config.targetRangeId}
+            onValueChange={(rangeId) => onConfigChange({ ...config, targetRangeId: rangeId })}
+            disabled={!selectedFolderId}
+          >
+            <SelectTrigger><SelectValue placeholder="Выберите ренж" /></SelectTrigger>
+            <SelectContent>
+              {rangesInSelectedFolder.map(range => (
+                <SelectItem key={range.id} value={range.id}>{range.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const LegendPreviewDialog = ({
   isOpen,
   onOpenChange,
   linkedRange,
   actionButtons,
-  initialOverrides,
+  editingButton,
   onSave,
+  folders,
 }: LegendPreviewDialogProps) => {
-  const [tempLegendOverrides, setTempLegendOverrides] = useState<Record<string, string>>(initialOverrides);
+  const [tempLegendOverrides, setTempLegendOverrides] = useState<Record<string, string>>({});
+  const [linkButtonConfigs, setLinkButtonConfigs] = useState<LinkButtonConfig[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      setTempLegendOverrides(initialOverrides);
+      setTempLegendOverrides(editingButton?.legendOverrides || {});
+      const initialConfigs = editingButton?.linkButtons || [];
+      const configs: LinkButtonConfig[] = Array(2).fill(null).map((_, index) => ({
+        ...(initialConfigs[index] || { enabled: false, text: '', position: 'center', targetRangeId: '' })
+      }));
+      setLinkButtonConfigs(configs);
     }
-  }, [isOpen, initialOverrides]);
+  }, [isOpen, editingButton]);
 
   const handleSave = () => {
     const cleanedOverrides: Record<string, string> = {};
@@ -70,7 +181,18 @@ export const LegendPreviewDialog = ({
         cleanedOverrides[key] = tempLegendOverrides[key].trim();
       }
     }
-    onSave(cleanedOverrides);
+    onSave({ overrides: cleanedOverrides, linkButtonsConfig: linkButtonConfigs });
+    onOpenChange(false);
+  };
+
+  const handleLinkButtonConfigChange = (index: number, newConfig: LinkButtonConfig) => {
+    const updatedConfigs = [...linkButtonConfigs];
+    updatedConfigs[index] = newConfig;
+    // Sync position across both buttons
+    if (index === 0) {
+      updatedConfigs[1] = { ...updatedConfigs[1], position: newConfig.position };
+    }
+    setLinkButtonConfigs(updatedConfigs);
   };
 
   const actionsInPreviewedRange = useMemo(() => {
@@ -113,11 +235,36 @@ export const LegendPreviewDialog = ({
                 </div>
               ))}
             </div>
+            
+            <div className="mt-6 pt-4 border-t">
+              <h4 className="font-semibold mb-3">Кнопки-ссылки на другой ренж</h4>
+              {linkButtonConfigs.map((config, index) => (
+                <div key={index}>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Checkbox
+                      id={`enable-link-button-${index}`}
+                      checked={config.enabled}
+                      onCheckedChange={(checked) => handleLinkButtonConfigChange(index, { ...config, enabled: !!checked })}
+                    />
+                    <Label htmlFor={`enable-link-button-${index}`}>Показывать кнопку-ссылку #{index + 1}</Label>
+                  </div>
+                  {config.enabled && (
+                    <LinkButtonEditor
+                      config={config}
+                      onConfigChange={(newConfig) => handleLinkButtonConfigChange(index, newConfig)}
+                      folders={folders}
+                      buttonIndex={index}
+                    />
+                  )}
+                  {index === 0 && <Separator className="my-4" />}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
-          <Button onClick={handleSave}>Сохранить легенду</Button>
+          <Button onClick={handleSave}>Сохранить</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

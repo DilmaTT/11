@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PokerMatrix, getCombinations, TOTAL_POKER_COMBINATIONS } from "./PokerMatrix";
+import { PokerMatrix } from "./PokerMatrix";
 import { PokerCard } from "./PokerCard";
 import { TrainingResultsDialog } from "./TrainingResultsDialog";
 import { X, Play } from "lucide-react";
@@ -9,49 +9,78 @@ import { cn } from "@/lib/utils";
 import { useRangeContext, ActionButton } from "@/contexts/RangeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { allPossibleHands, generateBorderHands, getCombinations, TOTAL_POKER_COMBINATIONS } from "@/lib/poker-utils";
 
 interface TrainingSessionProps {
   training: any;
   onStop: () => void;
 }
 
-const allHands = [
-  'AA', 'AKs', 'AQs', 'AJs', 'ATs', 'A9s', 'A8s', 'A7s', 'A6s', 'A5s', 'A4s', 'A3s', 'A2s',
-  'AKo', 'KK', 'KQs', 'KJs', 'KTs', 'K9s', 'K8s', 'K7s', 'K6s', 'K5s', 'K4s', 'K3s', 'K2s',
-  'AQo', 'KQo', 'QQ', 'QJs', 'QTs', 'Q9s', 'Q8s', 'Q7s', 'Q6s', 'Q5s', 'Q4s', 'Q3s', 'Q2s',
-  'AJo', 'KJo', 'QJo', 'JJ', 'JTs', 'J9s', 'J8s', 'J7s', 'J6s', 'J5s', 'J4s', 'J3s', 'J2s',
-  'ATo', 'KTo', 'QTo', 'JTo', 'TT', 'T9s', 'T8s', 'T7s', 'T6s', 'T5s', 'T4s', 'T3s', 'T2s',
-  'A9o', 'K9o', 'Q9o', 'J9o', 'T9o', '99', '98s', '97s', '96s', '95s', '94s', '93s', '92s',
-  'A8o', 'K8o', 'Q8o', 'J8o', 'T8o', '98o', '88', '87s', '86s', '85s', '84s', '83s', '82s',
-  'A7o', 'K7o', 'Q7o', 'J7o', 'T7o', '97o', '87o', '77', '76s', '75s', '74s', '73s', '72s',
-  'A6o', 'K6o', 'Q6o', 'J6o', 'T6o', '96o', '86o', '76o', '66', '65s', '64s', '63s', '62s',
-  'A5o', 'K5o', 'Q5o', 'J5o', 'T5o', '95o', '85o', '75o', '65o', '55', '54s', '53s', '52s',
-  'A4o', 'K4o', 'Q4o', 'J4o', 'T4o', '94o', '84o', '74o', '64o', '54o', '44', '43s', '42s',
-  'A3o', 'K3o', 'Q3o', 'J3o', 'T3o', '93o', '83o', '73o', '63o', '53o', '43o', '33', '32s',
-  'A2o', 'K2o', 'Q2o', 'J2o', 'T2o', '92o', '82o', '72o', '62o', '52o', '42o', '32o', '22'
-];
+const SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
 
-const getCombinationsForHand = (hand: string): number => {
-  if (hand.length === 3) {
-    if (hand[2] === 's') return 4;
-    if (hand[2] === 'o') return 12;
+const getRandomSuit = () => SUITS[Math.floor(Math.random() * SUITS.length)];
+const getTwoDifferentRandomSuits = () => {
+  let suit1 = getRandomSuit();
+  let suit2 = getRandomSuit();
+  while (suit1 === suit2) {
+    suit2 = getRandomSuit();
   }
-  if (hand.length === 2 && hand[0] === hand[1]) {
-    return 6;
-  }
-  return 0;
+  return [suit1, suit2];
 };
 
-const allPossibleHands = allHands.flatMap(hand => {
-  const combos = getCombinationsForHand(hand);
-  return Array(combos).fill(hand);
-});
+const generateHandDisplayInfo = (hand: string) => {
+  let cardsInfo: Array<{ rank: string, suit: string }>;
+
+  if (hand.length === 2 && hand[0] === hand[1]) { // Pocket pairs like AA, KK, etc.
+    const [suit1, suit2] = getTwoDifferentRandomSuits();
+    cardsInfo = [
+      { rank: hand[0], suit: suit1 },
+      { rank: hand[1], suit: suit2 }
+    ];
+  } else if (hand.length === 3) { // Suited or offsuit like AKs, AKo
+    const suited = hand[2] === 's';
+    if (suited) {
+      const commonSuit = getRandomSuit();
+      cardsInfo = [
+        { rank: hand[0], suit: commonSuit },
+        { rank: hand[1], suit: commonSuit }
+      ];
+    } else { // Offsuit
+      const [suit1, suit2] = getTwoDifferentRandomSuits();
+      cardsInfo = [
+        { rank: hand[0], suit: suit1 },
+        { rank: hand[1], suit: suit2 }
+      ];
+    }
+  } else if (hand.length === 2) { // Non-paired offsuit like AK, QJ (implicitly offsuit if no 's' or 'o')
+    const [suit1, suit2] = getTwoDifferentRandomSuits();
+    cardsInfo = [
+      { rank: hand[0], suit: suit1 },
+      { rank: hand[1], suit: suit2 }
+    ];
+  }
+  else {
+    // Fallback for invalid hand format, though it should not happen with proper data
+    cardsInfo = [
+      { rank: 'A', suit: 'spades' },
+      { rank: 'A', suit: 'hearts' }
+    ];
+  }
+  return { hand, cards: cardsInfo };
+};
+
 
 const getActionColor = (actionId: string, allButtons: ActionButton[]): string => {
     if (actionId === 'fold') return '#6b7280';
     const button = allButtons.find(b => b.id === actionId);
     if (button && button.type === 'simple') {
         return button.color;
+    }
+    // For weighted buttons, we need to find the base simple buttons
+    const weightedButton = allButtons.find(b => b.id === actionId);
+    if (weightedButton && weightedButton.type === 'weighted') {
+        // This case is handled by getActionButtonStyle, but as a fallback we can return a default
+        return '#ffffff';
     }
     return '#ffffff';
 };
@@ -61,8 +90,11 @@ const getActionButtonStyle = (button: ActionButton, allButtons: ActionButton[]) 
         return { backgroundColor: button.color, color: 'white' };
     }
     if (button.type === 'weighted') {
-        const color1 = getActionColor(button.action1Id, allButtons);
-        const color2 = getActionColor(button.action2Id, allButtons);
+        const action1Button = allButtons.find(b => b.id === button.action1Id);
+        const action2Button = allButtons.find(b => b.id === button.action2Id);
+        const color1 = action1Button ? action1Button.color : '#ffffff';
+        const color2 = action2Button ? action2Button.color : '#ffffff';
+        
         return {
             background: `linear-gradient(to right, ${color1} ${button.weight}%, ${color2} ${button.weight}%)`,
             color: 'white',
@@ -76,8 +108,11 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  const [currentHandIndex, setCurrentHandIndex] = useState(0);
+  const [currentHand, setCurrentHand] = useState<string>('');
+  const [currentDisplayHandInfo, setCurrentDisplayHandInfo] = useState<{ hand: string, cards: Array<{ rank: string, suit: string }> } | null>(null);
+  const [handsForTraining, setHandsForTraining] = useState<string[]>([]);
   const [currentRangeIndex, setCurrentRangeIndex] = useState(0);
+  const [classicModeCurrentRange, setClassicModeCurrentRange] = useState<any>(null);
   const [sessionStats, setSessionStats] = useState({
     startTime: Date.now(),
     hands: [] as Array<{hand: string, correct: boolean, userAction?: string, correctAction?: string}>,
@@ -92,7 +127,9 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
   const [showResultsDialog, setShowResultsDialog] = useState(false);
   const [trainingResults, setTrainingResults] = useState<any>(null);
 
-  const getTrainingRanges = () => {
+  const autoProceedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const trainingRanges = useMemo(() => {
     const ranges = [];
     if (!training.ranges) return [];
     for (const rangeId of training.ranges) {
@@ -103,23 +140,33 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
         }
       }
     }
-    return ranges;
-  };
 
-  const trainingRanges = getTrainingRanges();
+    if (training.type === 'border-repeat' && training.rangeSelectionOrder === 'random') {
+        // Fisher-Yates (aka Knuth) Shuffle
+        for (let i = ranges.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [ranges[i], ranges[j]] = [ranges[j], ranges[i]];
+        }
+    }
+
+    return ranges;
+  }, [folders, training.ranges, training.type, training.rangeSelectionOrder]);
+
+  // For border-repeat mode, we iterate through ranges
   const currentRange = trainingRanges[currentRangeIndex];
+  // For classic mode, we use a random range, for border-repeat, we use the current one in the sequence
+  const activeRange = training.type === 'classic' ? classicModeCurrentRange : currentRange;
   
-    // Helper function to calculate hand combinations for border-repeat mode
-    const getSelectedCombinationsCount = () => {
-      if (!userMatrix) return 0;
-      let count = 0;
-      Object.entries(userMatrix).forEach(([hand, action]) => {
-          const combinations = getCombinations(hand);
-          if (action && action !== 'fold' && typeof combinations === 'number' && !isNaN(combinations)) {
-              count += combinations;
-          }
-      });
-      return count;
+  const getSelectedCombinationsCount = () => {
+    if (!userMatrix) return 0;
+    let count = 0;
+    Object.entries(userMatrix).forEach(([hand, action]) => {
+        const combinations = getCombinations(hand);
+        if (action && action !== 'fold' && typeof combinations === 'number' && !isNaN(combinations)) {
+            count += combinations;
+        }
+    });
+    return count;
   };
   
   const getSelectedCombinationsPercentage = () => {
@@ -127,42 +174,73 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
       return TOTAL_POKER_COMBINATIONS > 0 ? Math.round((selectedCount / TOTAL_POKER_COMBINATIONS) * 100) : 0;
   };
 
-  const generateHands = () => {
+  const generateNewClassicHand = () => {
+    const randomIndex = Math.floor(Math.random() * allPossibleHands.length);
+    const newHand = allPossibleHands[randomIndex];
+    setCurrentHand(newHand);
+    setCurrentDisplayHandInfo(generateHandDisplayInfo(newHand));
+  };
+
+  useEffect(() => {
+    if (trainingRanges.length === 0) return;
+
     if (training.type === 'classic') {
+      // Pick a random range for the first hand
+      const randomRangeIndex = Math.floor(Math.random() * trainingRanges.length);
+      const initialRange = trainingRanges[randomRangeIndex];
+      setClassicModeCurrentRange(initialRange);
+
       if (training.subtype === 'all-hands') {
-        return [...allPossibleHands].sort(() => Math.random() - 0.5);
+        generateNewClassicHand();
       } else if (training.subtype === 'border-check') {
-        return allHands.sort(() => Math.random() - 0.5).slice(0, 20);
+        if (!initialRange) return;
+        const handPool = generateBorderHands(initialRange.hands, training.borderExpansionLevel);
+        setHandsForTraining(handPool);
+        if (handPool.length > 0) {
+          const randomIndex = Math.floor(Math.random() * handPool.length);
+          const newHand = handPool[randomIndex];
+          setCurrentHand(newHand);
+          setCurrentDisplayHandInfo(generateHandDisplayInfo(newHand));
+        } else {
+            toast({
+                title: "Не удалось определить границу ренжа",
+                description: "Ренж может быть пустым, занимать всю матрицу или не содержать граничных рук.",
+                variant: "warning",
+            });
+            setCurrentHand('');
+            setCurrentDisplayHandInfo(null);
+        }
       }
     }
-    return [];
-  };
 
-  const [hands] = useState(generateHands());
-  const currentHand = hands[currentHandIndex];
+    // Cleanup timeout on component unmount or training type change
+    return () => {
+      if (autoProceedTimeoutRef.current) {
+        clearTimeout(autoProceedTimeoutRef.current);
+      }
+    };
+  }, [training.type, training.subtype, training.borderExpansionLevel, trainingRanges]);
 
   const getCorrectAction = (hand: string) => {
-    if (!currentRange) return 'fold';
-    return currentRange.hands[hand] || 'fold';
+    if (!activeRange || !hand) return 'fold';
+    return activeRange.hands[hand] || 'fold';
   };
 
-  // Filter action buttons based on whether they are used in the current range
   const filteredActionButtons = actionButtons.filter(button => {
-    if (!currentRange || !currentRange.hands) return false;
+    if (!activeRange || !activeRange.hands) return false;
 
-    const usedActions = Object.values(currentRange.hands);
+    const usedActions = new Set(Object.values(activeRange.hands));
     
     if (button.type === 'simple') {
-      return usedActions.includes(button.id);
+      return usedActions.has(button.id);
     } else if (button.type === 'weighted') {
-      // For weighted buttons, only show if the weighted button's own ID is used to color a cell
-      return usedActions.includes(button.id); 
+      return usedActions.has(button.action1Id) && usedActions.has(button.action2Id);
     }
     return false;
   });
 
   const handleClassicAnswer = (action: string) => {
-    if (feedback) return;
+    if (feedback || !currentHand) return;
 
     const correctAction = getCorrectAction(currentHand);
     const isCorrect = action === correctAction;
@@ -184,10 +262,15 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
     });
 
     if (isCorrect) {
-      setTimeout(() => {
+      // Auto-proceed after 1.5 seconds if correct
+      autoProceedTimeoutRef.current = setTimeout(() => {
         proceedToNext();
-      }, 3000);
+      }, 1500); // Changed from 1000 to 1500
+      // Do NOT set canProceed(true) for correct answers
     } else {
+      // Allow user to click "Play" to proceed only if incorrect
+      setCanProceed(true); 
+      // Always show correct range if incorrect
       setShowCorrectRange(true);
     }
   };
@@ -247,20 +330,45 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
   };
 
   const proceedToNext = () => {
+    // Clear any pending auto-proceed timeout
+    if (autoProceedTimeoutRef.current) {
+      clearTimeout(autoProceedTimeoutRef.current);
+      autoProceedTimeoutRef.current = null;
+    }
+
     if (training.type === 'classic') {
-      if (currentHandIndex < hands.length - 1) {
-        setCurrentHandIndex(prev => prev + 1);
-      } else {
-        finishTraining();
-        return;
+      const randomRangeIndex = Math.floor(Math.random() * trainingRanges.length);
+      const nextRange = trainingRanges[randomRangeIndex];
+      setClassicModeCurrentRange(nextRange);
+
+      if (training.subtype === 'all-hands') {
+        generateNewClassicHand();
+      } else if (training.subtype === 'border-check') {
+        if (!nextRange) {
+          finishTraining();
+          return;
+        }
+        const handPool = generateBorderHands(nextRange.hands, training.borderExpansionLevel);
+        setHandsForTraining(handPool);
+        if (handPool.length > 0) {
+          const nextHandIndex = Math.floor(Math.random() * handPool.length);
+          const nextHand = handPool[nextHandIndex];
+          setCurrentHand(nextHand);
+          setCurrentDisplayHandInfo(generateHandDisplayInfo(nextHand));
+        } else {
+          toast({
+            title: "Тренировка завершена",
+            description: "Не удалось найти подходящие руки в одном из ренжей.",
+            variant: "info",
+          });
+          finishTraining();
+          return;
+        }
       }
     } else {
       if (currentRangeIndex < trainingRanges.length - 1) {
         setCurrentRangeIndex(prev => prev + 1);
         setUserMatrix({});
-        setIsChecked(false);
-        setCanProceed(false);
-        setActiveAction(actionButtons[0]?.id || '');
       } else {
         finishTraining();
         return;
@@ -269,9 +377,18 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
     
     setFeedback(null);
     setShowCorrectRange(false);
+    setCanProceed(false); // Reset canProceed for the next question
+    setIsChecked(false); // Reset for border repeat
+    setActiveAction(actionButtons[0]?.id || ''); // Reset active action for border repeat
   };
 
   const finishTraining = () => {
+    // Clear any pending auto-proceed timeout before finishing
+    if (autoProceedTimeoutRef.current) {
+      clearTimeout(autoProceedTimeoutRef.current);
+      autoProceedTimeoutRef.current = null;
+    }
+
     const finishTime = Date.now();
     const duration = finishTime - sessionStats.startTime;
     const correctAnswers = sessionStats.hands.filter(h => h.correct).length;
@@ -318,7 +435,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  if (!currentRange) {
+  if (trainingRanges.length === 0) {
     return (
       <div className="h-full bg-background flex items-center justify-center">
         <Card className="p-6 text-center">
@@ -333,7 +450,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
     <div className="h-full bg-background flex flex-col sm:flex-row">
       <div className="hidden sm:block w-80 bg-card border-r p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Статистика</h2>
+          <h2 className="text-lg font-semibold">Статистика: {training.name}</h2>
         </div>
         
         <div className="space-y-3">
@@ -377,7 +494,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
         <div className="sm:hidden px-4 py-2 border-b bg-card">
           <div className="flex items-center justify-between">
             <div className="text-lg font-semibold">
-              {currentRange.folderName} - {currentRange.name}
+              {activeRange?.folderName} - {activeRange?.name}
             </div>
           </div>
         </div>
@@ -388,10 +505,10 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
               <div className="space-y-6">
                 <div className="hidden sm:block text-center">
                   <h1 className="text-2xl font-bold mb-2">
-                    {currentRange.folderName} - {currentRange.name}
+                    {activeRange?.folderName} - {activeRange?.name}
                   </h1>
                   <p className="text-muted-foreground">
-                    Текущая рука: {currentHand} ({currentHandIndex + 1}/{hands.length})
+                    Текущая рука: {currentHand}
                   </p>
                 </div>
                 
@@ -406,11 +523,11 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                     
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                       <div className="bg-black rounded-full p-4 shadow-xl border-4 border-gray-800">
-                        <PokerCard hand={currentHand} className="scale-90 sm:scale-100" />
+                        <PokerCard hand={currentHand} fixedCards={currentDisplayHandInfo?.cards} className="scale-90 sm:scale-100" />
                       </div>
                     </div>
                     
-                    {feedback === 'incorrect' && (
+                    {canProceed && ( // Show Play button ONLY when canProceed is true (i.e., incorrect answer)
                       <div className="absolute top-1/2 right-8 sm:right-12 transform -translate-y-1/2">
                         <Button
                           onClick={proceedToNext}
@@ -429,7 +546,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                   
                   <div className="sm:hidden text-center mt-4">
                     <p className="text-muted-foreground text-sm">
-                      Рука {currentHandIndex + 1} из {hands.length}: <span className="font-bold text-primary">{currentHand}</span>
+                      Рука {sessionStats.hands.length + 1}: <span className="font-bold text-primary">{currentHand}</span>
                     </p>
                   </div>
                 </div>
@@ -439,7 +556,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                     variant="secondary"
                     size="sm"
                     onClick={() => handleClassicAnswer('fold')}
-                    disabled={!!feedback}
+                    disabled={canProceed} // Disable after answer
                     className={cn(
                       "bg-gray-500 text-white hover:bg-gray-600 text-xs sm:text-sm px-3 sm:px-4",
                       feedback === 'incorrect' && getCorrectAction(currentHand) === 'fold' && "ring-2 ring-green-500"
@@ -452,7 +569,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                       key={button.id}
                       size="sm"
                       onClick={() => handleClassicAnswer(button.id)}
-                      disabled={!!feedback}
+                      disabled={canProceed} // Disable after answer
                       style={getActionButtonStyle(button, actionButtons)}
                       className={cn(
                         "text-white hover:opacity-80 text-xs sm:text-sm px-3 sm:px-4",
@@ -464,12 +581,12 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                   ))}
                 </div>
 
-                {showCorrectRange && (
+                {showCorrectRange && activeRange && (
                   <div className="space-y-4">
                     <h3 className="text-center text-lg font-semibold">Правильный ренж:</h3>
                     <div className="overflow-x-auto">
                       <PokerMatrix
-                        selectedHands={currentRange.hands}
+                        selectedHands={activeRange.hands}
                         onHandSelect={() => {}}
                         activeAction=""
                         actionButtons={actionButtons}
@@ -491,14 +608,13 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                 {isMobile ? (
                   // --- MOBILE LAYOUT for Border Repeat ---
                   <div className="space-y-2 sm:space-y-2">
-                    <div className="overflow-x-auto pb-1 -mt-6 sm:mt-0">
+                    <div className="overflow-x-auto pb-1">
                       <PokerMatrix
                         selectedHands={showCorrectRange ? currentRange.hands : userMatrix}
                         onHandSelect={handleMatrixSelect}
                         activeAction={activeAction}
                         actionButtons={actionButtons}
                         readOnly={isChecked}
-                        initialScale={1}
                       />
                     </div>
                     <div className="flex justify-center gap-2 sm:gap-3 flex-wrap px-2 sm:px-4">
@@ -508,7 +624,7 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                           size="sm"
                           onClick={() => setActiveAction(button.id)}
                           disabled={isChecked}
-                          style={{ backgroundColor: button.color }}
+                          style={getActionButtonStyle(button, actionButtons)}
                           className={cn(
                             "text-white hover:opacity-80 text-xs sm:text-sm px-2 sm:px-4 h-7 py-1",
                             activeAction === button.id && "ring-2 ring-white"
@@ -544,23 +660,28 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                   </div>
                 ) : (
                   // --- DESKTOP LAYOUT for Border Repeat ---
-                  <div className="space-y-4 lg:w-[63%] mx-auto">
-                    <div className="flex justify-between items-end">
-                      <div className="text-left">
-                        <h2 className="text-base font-bold text-muted-foreground mb-px">
-                          {currentRange.folderName}
-                        </h2>
-                        <h1 className="text-sm font-normal ml-1">
-                          {currentRange.name}
-                        </h1>
-                      </div>
-                      <div className="bg-background/80 px-2 py-1 rounded text-xs font-mono flex items-center gap-1 z-10">
-                        <span className="text-primary font-bold">{getSelectedCombinationsPercentage()}%</span>
-                        <span className="text-muted-foreground">({getSelectedCombinationsCount()})</span>
+                  <div className="flex flex-col items-center w-full">
+                    {/* Title and stats container */}
+                    <div className="w-full max-w-[600px] px-4">
+                      <div className="flex justify-between items-end">
+                        <div className="text-left">
+                          <h2 className="text-base font-bold text-muted-foreground mb-px">
+                            {currentRange?.folderName}
+                          </h2>
+                          <h1 className="text-sm font-normal ml-1">
+                            {currentRange?.name}
+                          </h1>
+                        </div>
+                        <div className="bg-background/80 px-2 py-1 rounded text-xs font-mono flex items-center gap-1 z-10">
+                          <span className="text-primary font-bold">{getSelectedCombinationsPercentage()}%</span>
+                          <span className="text-muted-foreground">({getSelectedCombinationsCount()})</span>
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="overflow-x-auto">
+                    {/* Matrix and buttons group */}
+                    <div className="w-full flex justify-center mt-1">
+                      <div className="w-[87%] max-w-[522px]">
                         <PokerMatrix
                             selectedHands={showCorrectRange ? currentRange.hands : userMatrix}
                             onHandSelect={handleMatrixSelect}
@@ -568,48 +689,51 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                             actionButtons={actionButtons}
                             readOnly={isChecked}
                         />
-                    </div>
+                        
+                        <div className="mt-3 space-y-3">
+                          <div className="flex justify-center gap-2 sm:gap-3 flex-wrap px-2 sm:px-4">
+                            {filteredActionButtons.map((button) => (
+                              <Button
+                                key={button.id}
+                                size="sm"
+                                onClick={() => setActiveAction(button.id)}
+                                disabled={isChecked}
+                                style={getActionButtonStyle(button, actionButtons)}
+                                className={cn(
+                                  "text-white hover:opacity-80 text-xs sm:text-sm px-2 sm:px-4 h-7 py-1",
+                                  activeAction === button.id && "ring-2 ring-white"
+                                )}
+                              >
+                                {button.name}
+                              </Button>
+                            ))}
+                          </div>
 
-                    <div className="flex justify-center gap-2 sm:gap-3 flex-wrap px-2 sm:px-4">
-                      {filteredActionButtons.map((button) => (
-                        <Button
-                          key={button.id}
-                          size="sm"
-                          onClick={() => setActiveAction(button.id)}
-                          disabled={isChecked}
-                          style={{ backgroundColor: button.color }}
-                          className={cn(
-                            "text-white hover:opacity-80 text-xs sm:text-sm px-2 sm:px-4 h-7 py-1",
-                            activeAction === button.id && "ring-2 ring-white"
-                          )}
-                        >
-                          {button.name}
-                        </Button>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-center items-center gap-2 sm:gap-4 px-4">
-                      <Button
-                        onClick={checkBorderRepeat}
-                        disabled={isChecked}
-                        variant={feedback === 'correct' ? 'default' : feedback === 'incorrect' ? 'destructive' : 'poker'}
-                        className={cn("h-7 py-1", feedback === 'correct' ? 'bg-green-600 hover:bg-green-700' : '')}
-                        size="sm"
-                      >
-                        Проверить
-                      </Button>
-                      {canProceed && (
-                        <Button
-                          onClick={proceedToNext}
-                          className="bg-gray-500 hover:bg-gray-600 text-white w-8 h-8 rounded-lg shadow-lg border-2 border-gray-700"
-                          size="icon"
-                        >
-                          <Play className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <Button onClick={finishTraining} variant="destructive" size="sm" className="h-7 py-1">
-                        Завершить
-                      </Button>
+                          <div className="flex justify-center items-center gap-2 sm:gap-4 px-4">
+                            <Button
+                              onClick={checkBorderRepeat}
+                              disabled={isChecked}
+                              variant={feedback === 'correct' ? 'default' : feedback === 'incorrect' ? 'destructive' : 'poker'}
+                              className={cn("h-7 py-1", feedback === 'correct' ? 'bg-green-600 hover:bg-green-700' : '')}
+                              size="sm"
+                            >
+                              Проверить
+                            </Button>
+                            {canProceed && (
+                              <Button
+                                onClick={proceedToNext}
+                                className="bg-gray-500 hover:bg-gray-600 text-white w-8 h-8 rounded-lg shadow-lg border-2 border-gray-700"
+                                size="icon"
+                              >
+                                <Play className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button onClick={finishTraining} variant="destructive" size="sm" className="h-7 py-1">
+                              Завершить
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

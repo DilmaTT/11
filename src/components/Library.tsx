@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { X, ArrowLeft, Circle, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRangeContext } from "@/contexts/RangeContext";
@@ -31,6 +41,7 @@ export const Library = ({ isMobileMode = false }: LibraryProps) => {
   const [cells, setCells] = useState<CellData[]>([]);
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [viewingRange, setViewingRange] = useState<CellData | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<number | null>(null);
   const isMobile = useIsMobile();
 
   // Get all available ranges from folders
@@ -75,6 +86,13 @@ export const Library = ({ isMobileMode = false }: LibraryProps) => {
       if (cell) {
         setViewingRange(cell);
       }
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteCandidate !== null) {
+      setCells(prev => prev.filter(cell => cell.position !== deleteCandidate));
+      setDeleteCandidate(null);
     }
   };
 
@@ -319,7 +337,7 @@ export const Library = ({ isMobileMode = false }: LibraryProps) => {
               existingCell={selectedCell !== null ? getCellAt(selectedCell) : undefined}
               onDelete={() => {
                 if (selectedCell !== null) {
-                  setCells(prev => prev.filter(cell => cell.position !== selectedCell));
+                  setDeleteCandidate(selectedCell);
                   setSelectedCell(null);
                 }
               }}
@@ -327,6 +345,26 @@ export const Library = ({ isMobileMode = false }: LibraryProps) => {
             />
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={deleteCandidate !== null} onOpenChange={(isOpen) => { if (!isOpen) setDeleteCandidate(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Это действие невозможно отменить. Это приведет к необратимому удалению чарта из сетки.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Отмена</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className={buttonVariants({ variant: "destructive" })}
+              >
+                Удалить
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
