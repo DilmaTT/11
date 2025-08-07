@@ -82,7 +82,7 @@ const CustomDialog = ({ isOpen, onClose, children, isMobileMode = false }) => {
             <div 
                 className={cn(
                     "bg-background rounded-lg shadow-2xl",
-                    isMobileMode ? "w-full p-2" : "w-auto p-4"
+                    isMobileMode ? "w-full p-0" : "w-auto p-4"
                 )}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -295,31 +295,33 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                 readOnly={true}
                 isBackgroundMode={false}
               />
-              {activeButton?.showLegend && (
-                <Legend
-                  usedActions={usedActions}
-                  allActionButtons={actionButtons}
-                  legendOverrides={activeButton?.legendOverrides}
-                />
-              )}
-              {activeButton?.linkButtons && activeButton.linkButtons.some(b => b.enabled) && (
-                <div className={cn(
-                  "mt-4 flex gap-4",
-                  linkButtonContainerPositionClass[activeButton.linkButtons[0].position]
-                )}>
-                  {activeButton.linkButtons.map((linkButton, index) => (
-                    linkButton.enabled && linkButton.targetRangeId && (
-                      <Button
-                        key={index}
-                        onClick={() => handleLinkButtonClick(linkButton.targetRangeId)}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold w-20 h-6 px-2 text-xs"
-                      >
-                        {linkButton.text || "Перейти"}
-                      </Button>
-                    )
-                  ))}
-                </div>
-              )}
+              <div className={cn(isMobileMode && "px-4")}>
+                {activeButton?.showLegend && (
+                  <Legend
+                    usedActions={usedActions}
+                    allActionButtons={actionButtons}
+                    legendOverrides={activeButton?.legendOverrides}
+                  />
+                )}
+                {activeButton?.linkButtons && activeButton.linkButtons.some(b => b.enabled) && (
+                  <div className={cn(
+                    "mt-4 flex gap-4",
+                    linkButtonContainerPositionClass[activeButton.linkButtons[0].position]
+                  )}>
+                    {activeButton.linkButtons.map((linkButton, index) => (
+                      linkButton.enabled && linkButton.targetRangeId && (
+                        <Button
+                          key={index}
+                          onClick={() => handleLinkButtonClick(linkButton.targetRangeId)}
+                          className="bg-green-600 hover:bg-green-700 text-white font-bold w-20 h-6 px-2 text-xs"
+                        >
+                          {linkButton.text || "Перейти"}
+                        </Button>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
       </CustomDialog>

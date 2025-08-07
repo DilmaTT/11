@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthDialog } from "./AuthDialog";
+import { EditorSettingsDialog } from "./dialogs/EditorSettingsDialog";
 import { Settings, Download, Upload, LogOut, CloudUpload, CloudDownload } from "lucide-react";
 import { importDataFromFile, exportDataToFile, syncDataToSupabase, loadDataFromSupabase, downloadCloudBackup } from "@/lib/data-manager";
 import { useState } from "react";
@@ -27,6 +28,7 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
   const { user, logout, isAuthenticated } = useAuth();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [editorSettingsOpen, setEditorSettingsOpen] = useState(false);
 
   // --- UNAUTHORIZED STATE ---
   if (!isAuthenticated) {
@@ -82,6 +84,11 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
                 <p>Вы вошли как</p>
                 <p className="font-semibold truncate">{user?.email}</p>
               </div>
+              <Button variant="outline" onClick={() => { setEditorSettingsOpen(true); closeMobileMenu(); }}>
+                <Settings className="mr-2 h-4 w-4" />
+                Настройки редактора
+              </Button>
+              <hr className="my-2"/>
               <Button variant="outline" onClick={() => { syncDataToSupabase(); closeMobileMenu(); }}>
                 <CloudUpload className="mr-2 h-4 w-4" />
                 Сохранить в облако
@@ -111,53 +118,70 @@ export const UserMenu = ({ isMobileMode }: UserMenuProps) => {
             </div>
           </DialogContent>
         </Dialog>
+        <EditorSettingsDialog
+          isOpen={editorSettingsOpen}
+          onOpenChange={setEditorSettingsOpen}
+          isMobileMode={isMobileMode}
+        />
       </>
     );
   }
 
   // Desktop View (Authorized)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>{userInitial}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-         <div className="px-2 py-1.5 text-sm">
-            <p className="font-semibold">Вы вошли как</p>
-            <p className="text-muted-foreground truncate">{user?.email}</p>
-         </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => syncDataToSupabase()}>
-          <CloudUpload className="mr-2 h-4 w-4" />
-          <span>Сохранить в облако</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => loadDataFromSupabase()}>
-          <CloudDownload className="mr-2 h-4 w-4" />
-          <span>Загрузить из облака</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={importDataFromFile}>
-          <Upload className="mr-2 h-4 w-4" />
-          <span>Импорт из файла</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportDataToFile}>
-          <Download className="mr-2 h-4 w-4" />
-          <span>Экспорт в файл</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={downloadCloudBackup}>
-          <CloudDownload className="mr-2 h-4 w-4" />
-          <span>Скачать бэкап из облака</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={logout}>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Выйти</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon" className="rounded-full">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback>{userInitial}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+           <div className="px-2 py-1.5 text-sm">
+              <p className="font-semibold">Вы вошли как</p>
+              <p className="text-muted-foreground truncate">{user?.email}</p>
+           </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setEditorSettingsOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Настройки редактора</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => syncDataToSupabase()}>
+            <CloudUpload className="mr-2 h-4 w-4" />
+            <span>Сохранить в облако</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => loadDataFromSupabase()}>
+            <CloudDownload className="mr-2 h-4 w-4" />
+            <span>Загрузить из облака</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={importDataFromFile}>
+            <Upload className="mr-2 h-4 w-4" />
+            <span>Импорт из файла</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={exportDataToFile}>
+            <Download className="mr-2 h-4 w-4" />
+            <span>Экспорт в файл</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={downloadCloudBackup}>
+            <CloudDownload className="mr-2 h-4 w-4" />
+            <span>Скачать бэкап из облака</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={logout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Выйти</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <EditorSettingsDialog
+        isOpen={editorSettingsOpen}
+        onOpenChange={setEditorSettingsOpen}
+        isMobileMode={isMobileMode}
+      />
+    </>
   );
 };

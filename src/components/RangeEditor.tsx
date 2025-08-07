@@ -642,10 +642,10 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
         // MOBILE LAYOUT
         <>
           {/* Main scrollable content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto py-4">
             <div className="mx-auto max-w-full">
               {/* Header: Folder/Range Name and Statistics */}
-              <div className="flex justify-between items-end mb-4">
+              <div className="flex justify-between items-end mb-4 px-4">
                 <div className="text-left">
                   {currentFolder && (
                     <h2 className="text-base font-bold text-muted-foreground mb-px">
@@ -679,7 +679,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
               )}
 
               {/* Action Buttons Block - MOVED HERE */}
-              <div className="bg-card rounded-lg p-3 mt-4">
+              <div className="bg-card rounded-lg p-3 mt-4 mx-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium">Действия</h3>

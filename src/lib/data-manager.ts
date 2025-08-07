@@ -9,6 +9,7 @@ interface AppData {
   trainings: any[];
   statistics: any[];
   charts: any[];
+  editorSettings: any;
   timestamp: string;
 }
 
@@ -28,6 +29,7 @@ const gatherData = (): AppData => {
   const trainings = JSON.parse(localStorage.getItem('training-sessions') || '[]');
   const statistics = JSON.parse(localStorage.getItem('training-statistics') || '[]');
   const charts = JSON.parse(localStorage.getItem('userCharts') || '[]');
+  const editorSettings = JSON.parse(localStorage.getItem('poker-editor-settings') || '{}');
 
   const data = {
     version: APP_DATA_VERSION,
@@ -36,6 +38,7 @@ const gatherData = (): AppData => {
     trainings,
     statistics,
     charts,
+    editorSettings,
     timestamp: new Date().toISOString(),
   };
   console.log("[DM] Gathered data:", data);
@@ -59,6 +62,7 @@ const applyData = (data: AppData, reload: boolean = true) => {
     localStorage.setItem('training-sessions', JSON.stringify(data.trainings || []));
     localStorage.setItem('training-statistics', JSON.stringify(data.statistics || []));
     localStorage.setItem('userCharts', JSON.stringify(data.charts || []));
+    localStorage.setItem('poker-editor-settings', JSON.stringify(data.editorSettings || {}));
     localStorage.setItem('poker-data-timestamp', data.timestamp);
 
     console.log("[DM] Data successfully written to localStorage.");
@@ -100,6 +104,7 @@ export const syncDataToSupabase = async (showAlert = true) => {
       trainings: userData.trainings,
       statistics: userData.statistics,
       charts: userData.charts,
+      editor_settings: userData.editorSettings,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' });
 
@@ -156,6 +161,7 @@ export const loadDataFromSupabase = async (user: SupabaseUser | null) => {
                 trainings: userData.trainings || [],
                 statistics: userData.statistics || [],
                 charts: userData.charts || [],
+                editorSettings: userData.editor_settings || {},
                 timestamp: userData.updated_at || new Date().toISOString(),
               };
               console.log("[DM] Applying cloud data to local storage and reloading:", appData);
@@ -187,6 +193,7 @@ export const clearLocalData = () => {
   localStorage.removeItem('training-sessions');
   localStorage.removeItem('training-statistics');
   localStorage.removeItem('userCharts');
+  localStorage.removeItem('poker-editor-settings');
   localStorage.removeItem('poker-data-timestamp');
   console.log("[DM] Local data cleared. Reloading window...");
   window.location.reload();
@@ -372,6 +379,7 @@ export const downloadCloudBackup = async () => {
         trainings: data.trainings || [],
         statistics: data.statistics || [],
         charts: data.charts || [],
+        editorSettings: data.editor_settings || {},
         timestamp: data.updated_at || new Date().toISOString(),
       };
       exportForWeb(appData);
