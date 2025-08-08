@@ -45,7 +45,7 @@ export interface EditorSettings {
     size: 's' | 'm' | 'l' | 'xl' | 'custom';
     customSize: string;
     color: 'auto' | 'white' | 'black';
-    weight: 'light' | 'normal' | 'bold';
+    weight: 'normal' | 'bold';
   };
 }
 
@@ -63,7 +63,7 @@ const defaultEditorSettings: EditorSettings = {
   font: {
     size: 'm',
     customSize: '14px',
-    color: 'auto',
+    color: 'white', // Changed default font color to white
     weight: 'normal',
   },
 };
@@ -127,6 +127,9 @@ export const RangeProvider = ({ children }: { children: ReactNode }) => {
       }
       if (settings.font.size === 'custom' && !settings.font.customSize) {
         settings.font.customSize = defaultEditorSettings.font.customSize;
+      }
+      if (!['normal', 'bold'].includes(settings.font.weight)) {
+        settings.font.weight = defaultEditorSettings.font.weight;
       }
 
       return settings;

@@ -44,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(currentUser);
           console.log("AuthContext: User state set:", currentUser);
 
-          // Запускаем загрузку данных в фоновом режиме, не блокируя UI
           if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
             console.log("AuthContext: Triggering non-blocking data load.");
             loadDataFromSupabase(session.user);
@@ -57,9 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             clearLocalData();
           }
         }
-
-        // Важно: убираем состояние загрузки СРАЗУ ПОСЛЕ проверки сессии.
-        // Это позволит отобразить UI, не дожидаясь ответа от loadDataFromSupabase.
+        
         setLoading(false);
         console.log("AuthContext: setLoading(false). UI should now be unblocked.");
       }
@@ -70,6 +67,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
+
+  // Effect for auto-syncing data on page hide or close
+  useEffect(() => {
+    const handlePageHide = () => {
+      if (user) {
+        console.log("AuthContext: Syncing data on page hide.");
+        syncDataToSupabase(false); // Don't show alerts
+      }
+    };
+
+    // 'pagehide' is more reliable for end-of-session saves than 'visibilitychange'.
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [user]); // Rerun this effect if the user logs in or out
 
   const register = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     console.log("AuthContext: Attempting to register user:", email);
@@ -99,6 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     console.log("AuthContext: Attempting to log out user.");
+    // Sync data before signing out to save any changes
+    await syncDataToSupabase(false);
+    console.log("AuthContext: Data synced before logout.");
     await supabase.auth.signOut();
     console.log("AuthContext: Logout initiated.");
   };
@@ -114,7 +131,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
       }}
     >
-      {/* Убрано !loading, чтобы дочерние компоненты могли управлять своим состоянием загрузки */}
       {children}
     </AuthContext.Provider>
   );

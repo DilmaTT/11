@@ -36,15 +36,24 @@ const Legend = ({
   usedActions,
   allActionButtons,
   legendOverrides,
+  legendIsMultiLine,
 }: {
   usedActions: ActionButtonType[];
   allActionButtons: ActionButtonType[];
   legendOverrides?: Record<string, string>;
+  legendIsMultiLine?: boolean;
 }) => {
   if (usedActions.length === 0) return null;
 
+  const isMultiLine = legendIsMultiLine ?? true;
+
   return (
-    <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+    <div className={cn(
+      "mt-4",
+      isMultiLine
+        ? "flex flex-col items-start gap-y-2"
+        : "flex flex-row flex-wrap items-center gap-x-4 gap-y-2"
+    )}>
       {usedActions.map(action => (
         <div key={action.id} className="flex items-center gap-2">
           <div
@@ -101,6 +110,42 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [dynamicBorderStyle, setDynamicBorderStyle] = useState<React.CSSProperties>({});
 
+  const recordRangeAccess = (rangeId: string) => {
+    if (!rangeId) {
+      console.warn("[Stats] recordRangeAccess called with no rangeId.");
+      return;
+    }
+  
+    let stats: Record<string, number> = {};
+    try {
+      // Change key to 'poker-range-access-statistics'
+      const rawStats = localStorage.getItem('poker-range-access-statistics');
+      if (rawStats) {
+        const parsed = JSON.parse(rawStats);
+        // Ensure we have a valid object
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          stats = parsed;
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing range access statistics, starting fresh for this session.", error);
+      stats = {}; // Reset if parsing fails
+    }
+    
+    try {
+      // Ensure the existing count is a number before incrementing
+      const currentCount = Number(stats[rangeId]) || 0;
+      stats[rangeId] = currentCount + 1;
+      // Change key to 'poker-range-access-statistics'
+      localStorage.setItem('poker-range-access-statistics', JSON.stringify(stats));
+      console.log(`[Stats] Recorded access for range ${rangeId}. New count: ${stats[rangeId]}`);
+    } catch (error) {
+      // This could happen if localStorage is full
+      console.error("Error saving range access statistics to localStorage.", error);
+      alert("Не удалось сохранить статистику обращений к ренжам. Возможно, хранилище переполнено.");
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setViewportSize({ width: window.innerWidth, height: window.innerHeight });
@@ -154,6 +199,7 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
   
     const linkedRange = allRanges.find(range => range.id === button.linkedItem);
     if (linkedRange) {
+      recordRangeAccess(linkedRange.id);
       setDisplayedRange(linkedRange);
       setActiveButton(button);
       
@@ -179,6 +225,7 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
   const handleLinkButtonClick = (targetRangeId: string) => {
     const targetRange = allRanges.find(r => r.id === targetRangeId);
     if (targetRange) {
+      recordRangeAccess(targetRange.id);
       setDisplayedRange(targetRange);
     } else {
       alert('Связанный ренж не найден!');
@@ -287,6 +334,19 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                   {randomNumber}
                 </div>
               )}
+
+              {activeButton?.showTitle && activeButton.titleText && (
+                <h3
+                  className="mb-2 px-4 font-bold text-white"
+                  style={{
+                    fontSize: `${activeButton.titleFontSize || 20}px`,
+                    textAlign: activeButton.titleAlignment || 'center',
+                  }}
+                >
+                  {activeButton.titleText}
+                </h3>
+              )}
+
               <PokerMatrix
                 selectedHands={displayedRange.hands}
                 onHandSelect={() => {}}
@@ -301,6 +361,7 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                     usedActions={usedActions}
                     allActionButtons={actionButtons}
                     legendOverrides={activeButton?.legendOverrides}
+                    legendIsMultiLine={activeButton?.legendIsMultiLine}
                   />
                 )}
                 {activeButton?.linkButtons && activeButton.linkButtons.some(b => b.enabled) && (

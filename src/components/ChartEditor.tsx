@@ -9,6 +9,7 @@ import { ChartCanvas } from "./ChartCanvas";
 import { ChartControls } from "./ChartControls";
 import { ButtonSettingsDialog } from "./dialogs/ButtonSettingsDialog";
 import { LegendPreviewDialog } from "./dialogs/LegendPreviewDialog";
+import { syncDataToSupabase } from "@/lib/data-manager";
 
 interface ChartEditorProps {
   isMobileMode?: boolean;
@@ -27,6 +28,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
   const [canvasHeight, setCanvasHeight] = useState(chart.canvasHeight || 500);
   const [isButtonModalOpen, setIsButtonModalOpen] = useState(false);
   const [editingButton, setEditingButton] = useState<ChartButton | null>(null);
+  const [isCreatingNewButton, setIsCreatingNewButton] = useState(false);
   const [isLegendPreviewOpen, setIsLegendPreview] = useState(false);
   const [isMoveMode, setIsMoveMode] = useState(false);
 
@@ -138,21 +140,28 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       fontSize: 16,
       fontColor: 'white',
       showLegend: true,
+      legendIsMultiLine: true,
       showRandomizer: false,
       legendOverrides: {},
       linkButtons: [
         { enabled: false, text: '', position: 'center', targetRangeId: '' },
         { enabled: false, text: '', position: 'center', targetRangeId: '' }
-      ]
+      ],
+      showTitle: false,
+      titleText: '',
+      titleFontSize: 20,
+      titleAlignment: 'center',
     };
     setButtons((prev) => [...prev, newButton]);
     setEditingButton(newButton);
+    setIsCreatingNewButton(true);
     setIsButtonModalOpen(true);
   };
 
   const handleSettingsClick = (e: React.MouseEvent, button: ChartButton) => {
     e.stopPropagation();
     setEditingButton(button);
+    setIsCreatingNewButton(false);
     setIsButtonModalOpen(true);
   };
 
@@ -163,6 +172,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       );
       setIsButtonModalOpen(false);
       setEditingButton(null);
+      setIsCreatingNewButton(false);
     }
   };
 
@@ -172,49 +182,43 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     }
     setIsButtonModalOpen(false);
     setEditingButton(null);
+    setIsCreatingNewButton(false);
   };
 
   const duplicateCurrentButton = () => {
     if (editingButton) {
-      const GAP = 0.1;
+      const GAP = 10;
       let newX: number;
       let newY: number;
 
-      // Proposed horizontal position
       const horizontalX = editingButton.x + editingButton.width + GAP;
-      
-      // Check if horizontal placement is possible
       if (horizontalX + editingButton.width <= canvasWidth) {
         newX = horizontalX;
         newY = editingButton.y;
       } else {
-        // Proposed vertical position
         const verticalY = editingButton.y + editingButton.height + GAP;
-        
-        // Check if vertical placement is possible
         if (verticalY + editingButton.height <= canvasHeight) {
           newX = editingButton.x;
           newY = verticalY;
         } else {
-          // Fallback: place slightly offset from original, ensuring it's in bounds
-          newX = Math.min(editingButton.x + 10, canvasWidth - editingButton.width);
-          newY = Math.min(editingButton.y + 10, canvasHeight - editingButton.height);
+          newX = Math.min(editingButton.x + GAP, canvasWidth - editingButton.width);
+          newY = Math.min(editingButton.y + GAP, canvasHeight - editingButton.height);
         }
       }
 
-      // Final boundary check to be safe
       newX = Math.max(0, newX);
       newY = Math.max(0, newY);
 
       const newButton: ChartButton = {
         ...editingButton,
-        id: String(Date.now()), // New unique ID
+        id: String(Date.now()),
         x: newX,
         y: newY,
       };
       setButtons((prev) => [...prev, newButton]);
       setIsButtonModalOpen(false);
       setEditingButton(null);
+      setIsCreatingNewButton(false);
     }
   };
 
@@ -223,6 +227,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       setButtons(prev => prev.filter(btn => btn.id !== editingButton.id));
       setIsButtonModalOpen(false);
       setEditingButton(null);
+      setIsCreatingNewButton(false);
     }
   };
 
@@ -236,6 +241,8 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     };
     onSaveChart(updatedChart);
     onBackToCharts();
+    console.log("[ChartEditor] Chart saved, triggering background sync.");
+    syncDataToSupabase(false);
   };
 
   const handleDimensionChange = (value: string, dimension: 'width' | 'height') => {
@@ -266,13 +273,30 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     }
   };
 
-  const handleSaveLegendAndLinkConfig = (newConfig: { overrides: Record<string, string>, linkButtonsConfig?: ChartButton['linkButtons'] }) => {
+  const handleSaveLegendAndLinkConfig = (newConfig: { 
+    overrides: Record<string, string>, 
+    linkButtonsConfig?: ChartButton['linkButtons'],
+    titleConfig?: {
+      showTitle: boolean;
+      titleText: string;
+      titleFontSize: number;
+      titleAlignment: 'left' | 'center';
+    },
+    legendIsMultiLine?: boolean;
+  }) => {
     setEditingButton(prev => {
       if (!prev) return null;
       return { 
         ...prev, 
         legendOverrides: newConfig.overrides,
-        linkButtons: newConfig.linkButtonsConfig
+        linkButtons: newConfig.linkButtonsConfig,
+        legendIsMultiLine: newConfig.legendIsMultiLine,
+        ...(newConfig.titleConfig && {
+          showTitle: newConfig.titleConfig.showTitle,
+          titleText: newConfig.titleConfig.titleText,
+          titleFontSize: newConfig.titleConfig.titleFontSize,
+          titleAlignment: newConfig.titleConfig.titleAlignment,
+        })
       };
     });
     setIsLegendPreview(false); 
@@ -340,6 +364,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
           allRanges={allRanges}
           folders={folders} 
           onOpenLegendPreview={handleOpenLegendPreview}
+          isCreatingNewButton={isCreatingNewButton}
         />
 
         <LegendPreviewDialog

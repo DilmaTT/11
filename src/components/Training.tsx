@@ -88,7 +88,15 @@ export const Training = ({ isMobileMode: propIsMobileMode = false }: TrainingPro
   // Fetch detailed stats for main view
   useEffect(() => {
     if (selectedTraining) {
-      const allStats = JSON.parse(localStorage.getItem('training-statistics') || '[]') as SessionStat[];
+      const allStatsRaw = localStorage.getItem('training-statistics');
+      let allStats: SessionStat[] = [];
+      try {
+        const parsed = allStatsRaw ? JSON.parse(allStatsRaw) : [];
+        allStats = Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        console.error("Failed to parse training statistics", e);
+      }
+      
       const trainingStats = allStats
         .filter((stat) => stat.trainingId === selectedTraining)
         .sort((a, b) => b.timestamp - a.timestamp); // Sort by most recent
@@ -101,7 +109,15 @@ export const Training = ({ isMobileMode: propIsMobileMode = false }: TrainingPro
   // Fetch stats for modal view
   useEffect(() => {
     if (statsModalTrainingId) {
-      const allStats = JSON.parse(localStorage.getItem('training-statistics') || '[]') as SessionStat[];
+      const allStatsRaw = localStorage.getItem('training-statistics');
+      let allStats: SessionStat[] = [];
+      try {
+        const parsed = allStatsRaw ? JSON.parse(allStatsRaw) : [];
+        allStats = Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        console.error("Failed to parse training statistics", e);
+      }
+
       const trainingStats = allStats
         .filter((stat) => stat.trainingId === statsModalTrainingId)
         .sort((a, b) => b.timestamp - a.timestamp);
@@ -114,7 +130,17 @@ export const Training = ({ isMobileMode: propIsMobileMode = false }: TrainingPro
 
   // Calculate and update training statistics
   const getTrainingStats = (trainingId: string) => {
-    const savedStats = JSON.parse(localStorage.getItem('training-statistics') || '[]');
+    const savedStatsRaw = localStorage.getItem('training-statistics');
+    let savedStats: SessionStat[] = [];
+    try {
+      // Ensure we have an array, even if localStorage is corrupted or has old data.
+      const parsed = savedStatsRaw ? JSON.parse(savedStatsRaw) : [];
+      savedStats = Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Failed to parse training statistics from localStorage", e);
+      savedStats = [];
+    }
+
     const trainingStats = savedStats.filter((stat: any) => stat.trainingId === trainingId);
     
     if (trainingStats.length === 0) return null;
@@ -168,7 +194,14 @@ export const Training = ({ isMobileMode: propIsMobileMode = false }: TrainingPro
       setSelectedTraining(null);
     }
     // Also delete associated stats
-    const allStats = JSON.parse(localStorage.getItem('training-statistics') || '[]');
+    const allStatsRaw = localStorage.getItem('training-statistics');
+    let allStats: SessionStat[] = [];
+    try {
+      const parsed = allStatsRaw ? JSON.parse(allStatsRaw) : [];
+      allStats = Array.isArray(parsed) ? parsed : [];
+    } catch(e) {
+      // ignore
+    }
     const remainingStats = allStats.filter((stat: SessionStat) => stat.trainingId !== trainingId);
     localStorage.setItem('training-statistics', JSON.stringify(remainingStats));
     setStatsVersion(v => v + 1); // force refresh
@@ -254,8 +287,8 @@ export const Training = ({ isMobileMode: propIsMobileMode = false }: TrainingPro
   return (
     <>
       <div className={cn(
-        "bg-background",
-        isMobileMode ? "flex flex-col h-full" : "flex h-screen"
+        "bg-background flex h-full",
+        isMobileMode ? "flex-col" : ""
       )}>
         {/* Sidebar */}
         <div className={cn(

@@ -44,7 +44,8 @@ const getFontSizeClass = (size: EditorSettings['font']['size']) => {
 };
 
 const getFontWeightClass = (weight: EditorSettings['font']['weight']) => ({
-  'light': 'font-light', 'normal': 'font-normal', 'bold': 'font-bold'
+  'normal': 'font-normal',
+  'bold': 'font-bold',
 }[weight] || 'font-normal');
 
 export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionButtons, readOnly = false, isBackgroundMode = false }: PokerMatrixProps) => {

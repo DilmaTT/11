@@ -173,7 +173,6 @@ export const EditorSettingsDialog = ({ isOpen, onOpenChange, isMobileMode }: Edi
               <RadioGroup value={editorSettings.font.weight} onValueChange={(weight: EditorSettings['font']['weight']) => handleUpdateFontSetting('weight', weight)}
                 className="flex flex-wrap gap-4"
               >
-                <div className="flex items-center space-x-2"><RadioGroupItem value="light" id="weight-light" /><Label htmlFor="weight-light">Тонкий</Label></div>
                 <div className="flex items-center space-x-2"><RadioGroupItem value="normal" id="weight-normal" /><Label htmlFor="weight-normal">Обычный</Label></div>
                 <div className="flex items-center space-x-2"><RadioGroupItem value="bold" id="weight-bold" /><Label htmlFor="weight-bold">Жирный</Label></div>
               </RadioGroup>

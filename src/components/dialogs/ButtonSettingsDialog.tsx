@@ -36,6 +36,7 @@ interface ButtonSettingsDialogProps {
   allRanges: StoredRange[];
   folders: Folder[]; // New prop for folders
   onOpenLegendPreview: () => void;
+  isCreatingNewButton: boolean;
 }
 
 export const ButtonSettingsDialog = ({
@@ -51,6 +52,7 @@ export const ButtonSettingsDialog = ({
   allRanges,
   folders, // Destructure new prop
   onOpenLegendPreview,
+  isCreatingNewButton,
 }: ButtonSettingsDialogProps) => {
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -131,7 +133,14 @@ export const ButtonSettingsDialog = ({
         onOpenChange(true);
       }
     }}>
-      <DialogContent mobileFullscreen={isMobileMode}>
+      <DialogContent 
+        mobileFullscreen={isMobileMode}
+        onInteractOutside={(e) => {
+          if (isCreatingNewButton && !isMobileMode) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Настройка кнопки</DialogTitle>
         </DialogHeader>

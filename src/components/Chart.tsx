@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Play, Edit, Trash2 } from "lucide-react";
+import { Plus, Play, Edit, Trash2, BarChart } from "lucide-react";
 import { StoredChart } from "@/types/chart";
 import { cn } from "@/lib/utils";
+import { ChartStatsDialog } from "./dialogs/ChartStatsDialog";
 
 const getButtonNoun = (count: number): string => {
   const lastDigit = count % 10;
@@ -35,6 +36,8 @@ interface ChartProps {
 export const Chart = ({ isMobileMode, charts, onCreateChart, onDeleteChart, onEditChart, onPlayChart }: ChartProps) => {
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [newChartName, setNewChartName] = useState("");
+  const [isStatsDialogOpen, setStatsDialogOpen] = useState(false);
+  const [selectedChartForStats, setSelectedChartForStats] = useState<StoredChart | null>(null);
 
   const handleCreate = () => {
     if (newChartName.trim()) {
@@ -42,6 +45,11 @@ export const Chart = ({ isMobileMode, charts, onCreateChart, onDeleteChart, onEd
       setNewChartName("");
       setCreateDialogOpen(false);
     }
+  };
+
+  const handleOpenStats = (chart: StoredChart) => {
+    setSelectedChartForStats(chart);
+    setStatsDialogOpen(true);
   };
 
   return (
@@ -92,6 +100,9 @@ export const Chart = ({ isMobileMode, charts, onCreateChart, onDeleteChart, onEd
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenStats(chart); }}>
+                      <BarChart className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onPlayChart(chart); }}>
                       <Play className="h-4 w-4" />
                     </Button>
@@ -113,6 +124,11 @@ export const Chart = ({ isMobileMode, charts, onCreateChart, onDeleteChart, onEd
           )}
         </div>
       </div>
+      <ChartStatsDialog
+        isOpen={isStatsDialogOpen}
+        onOpenChange={setStatsDialogOpen}
+        chart={selectedChartForStats}
+      />
     </div>
   );
 };
