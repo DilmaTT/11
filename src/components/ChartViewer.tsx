@@ -118,7 +118,6 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
   
     let stats: Record<string, number> = {};
     try {
-      // Change key to 'poker-range-access-statistics'
       const rawStats = localStorage.getItem('poker-range-access-statistics');
       if (rawStats) {
         const parsed = JSON.parse(rawStats);
@@ -136,13 +135,11 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
       // Ensure the existing count is a number before incrementing
       const currentCount = Number(stats[rangeId]) || 0;
       stats[rangeId] = currentCount + 1;
-      // Change key to 'poker-range-access-statistics'
       localStorage.setItem('poker-range-access-statistics', JSON.stringify(stats));
-      console.log(`[Stats] Recorded access for range ${rangeId}. New count: ${stats[rangeId]}`);
     } catch (error) {
       // This could happen if localStorage is full
       console.error("Error saving range access statistics to localStorage.", error);
-      alert("Не удалось сохранить статистику обращений к ренжам. Возможно, хранилище переполнено.");
+      alert("Не удалось сохранить статистику. Возможно, хранилище переполнено.");
     }
   };
 

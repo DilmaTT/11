@@ -436,6 +436,39 @@ const importForCapacitor = () => {
 
 // --- Public API for File I/O ---
 
+export const resetRangeAccessStats = async (showAlert = true) => {
+  console.log("[DM] Resetting range access statistics...");
+
+  // 1. Clear local storage
+  localStorage.setItem('poker-range-access-statistics', JSON.stringify({}));
+  console.log("[DM] Local range access statistics cleared.");
+
+  // 2. Clear in Supabase if user is logged in
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    console.log("[DM] User is logged in, clearing range access stats in Supabase...");
+    const newTimestamp = new Date().toISOString();
+    const { error } = await supabase
+      .from('user_data')
+      .update({ 
+          range_access_stats: {},
+          updated_at: newTimestamp 
+      })
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error("[DM] Error clearing range access stats in Supabase:", error);
+      if (showAlert) alert("Ошибка при сбросе статистики в облаке. Локальная статистика сброшена.");
+    } else {
+      console.log("[DM] Supabase range access stats cleared successfully.");
+      localStorage.setItem('poker-data-timestamp', newTimestamp);
+      if (showAlert) alert("Статистика обращений к ренджам успешно сброшена.");
+    }
+  } else {
+      if (showAlert) alert("Статистика обращений к ренджам успешно сброшена.");
+  }
+};
+
 export const exportDataToFile = () => {
   console.log("[DM] Exporting data to file...");
   const appData = gatherData();

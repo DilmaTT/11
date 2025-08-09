@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StoredChart } from "@/types/chart";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import { resetRangeAccessStats } from "@/lib/data-manager";
 
 // Предполагаемые типы данных из localStorage для ясности
 interface Range {
@@ -42,8 +43,9 @@ interface ChartStatsDialogProps {
 export const ChartStatsDialog = ({ isOpen, onOpenChange, chart }: ChartStatsDialogProps) => {
   const [stats, setStats] = useState<ProcessedStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
 
-  useEffect(() => {
+  const fetchStats = () => {
     if (!isOpen || !chart) {
       return;
     }
@@ -51,7 +53,7 @@ export const ChartStatsDialog = ({ isOpen, onOpenChange, chart }: ChartStatsDial
     setIsLoading(true);
     try {
       // 1. Получаем данные из localStorage
-      const rawStats = localStorage.getItem('training-statistics');
+      const rawStats = localStorage.getItem('poker-range-access-statistics');
       const allStats: StatsData = rawStats ? JSON.parse(rawStats) : {};
 
       const rawFolders = localStorage.getItem('poker-ranges-folders');
@@ -104,7 +106,31 @@ export const ChartStatsDialog = ({ isOpen, onOpenChange, chart }: ChartStatsDial
     } finally {
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchStats();
+    }
   }, [isOpen, chart]);
+
+  const handleResetStats = async () => {
+    if (window.confirm("Вы уверены, что хотите сбросить всю статистику обращений к ренджам? Это действие необратимо и затронет данные в облаке, если вы авторизованы.")) {
+      setIsResetting(true);
+      try {
+        await resetRangeAccessStats();
+        // Refresh the stats displayed in the dialog by re-fetching
+        fetchStats();
+      } catch (error) {
+        console.error("Failed to reset stats:", error);
+        // Alert is handled in data-manager
+      } finally {
+        setIsResetting(false);
+      }
+    }
+  };
+
+  const hasStatsData = stats.filter(stat => stat.count > 0).length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -120,7 +146,7 @@ export const ChartStatsDialog = ({ isOpen, onOpenChange, chart }: ChartStatsDial
             <div className="flex justify-center items-center h-24">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : stats.length > 0 ? (
+          ) : hasStatsData ? (
             <ol className="list-decimal list-inside space-y-2">
               {stats.filter(stat => stat.count > 0).map((stat) => (
                 <li key={stat.id} className="text-sm">
@@ -128,21 +154,28 @@ export const ChartStatsDialog = ({ isOpen, onOpenChange, chart }: ChartStatsDial
                   <span className="text-muted-foreground ml-2">{stat.count} обращений</span>
                 </li>
               ))}
-              {stats.filter(stat => stat.count > 0).length === 0 && (
-                 <div className="text-center text-muted-foreground py-8">
-                    <p>Нет данных об обращениях к ренджам в этом чарте.</p>
-                 </div>
-              )}
             </ol>
           ) : (
             <div className="text-center text-muted-foreground py-8">
-              <p>Нет связанных ренджей для отображения статистики.</p>
-              <p className="text-xs mt-1">Добавьте в чарт кнопки, которые ссылаются на ренджи.</p>
+              <p>Нет данных об обращениях к ренджам в этом чарте.</p>
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Закрыть</Button>
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between sm:space-x-2">
+          <Button
+            variant="destructive"
+            onClick={handleResetStats}
+            disabled={isResetting || isLoading || !hasStatsData}
+            className="w-full sm:w-auto"
+          >
+            {isResetting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-4 w-4" />
+            )}
+            Сбросить статистику
+          </Button>
+          <Button onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Закрыть</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
