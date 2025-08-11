@@ -316,7 +316,7 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
           {displayedRange && (
             <div className={cn(
               "relative flex flex-col h-full",
-              isMobileMode && "pb-[30px]" // Space for the back button
+              isMobileMode ? "pb-[30px]" : "p-4" // Added p-4 for desktop dialog content
             )}>
               {activeButton?.showRandomizer && randomNumber !== null && (
                 <div 
@@ -344,7 +344,11 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                 </h3>
               )}
 
-              <div className="flex-grow min-h-0 flex items-center justify-center">
+              {/* Matrix container - removed flex-grow to fix its position */}
+              <div className={cn(
+                "flex items-center justify-center flex-shrink-0", // Ensure it doesn't grow
+                isMobileMode ? "w-full" : "h-full" // This ensures the matrix itself scales correctly
+              )}>
                 <div className={cn(
                   "aspect-square",
                   isMobileMode ? "w-full" : "h-full"

@@ -168,6 +168,13 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
       }
     }
 
+    // Apply 50% transparency for inactive cells if the setting is enabled
+    if (editorSettings.font.inactiveFontTransparent && !actionId) {
+      style.opacity = 0.5;
+    } else {
+      style.opacity = 1; // Ensure active cells are fully opaque
+    }
+
     return style;
   };
 

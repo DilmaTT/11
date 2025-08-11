@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRangeContext, EditorSettings } from "@/contexts/RangeContext";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 
 interface EditorSettingsDialogProps {
   isOpen: boolean;
@@ -167,6 +168,15 @@ export const EditorSettingsDialog = ({ isOpen, onOpenChange, isMobileMode }: Edi
                 <div className="flex items-center space-x-2"><RadioGroupItem value="white" id="color-white-font" /><Label htmlFor="color-white-font">Белый</Label></div>
                 <div className="flex items-center space-x-2"><RadioGroupItem value="black" id="color-black-font" /><Label htmlFor="color-black-font">Черный</Label></div>
               </RadioGroup>
+            </div>
+            {/* New Checkbox for Inactive Font Transparency */}
+            <div className="flex items-center space-x-2 pt-1.5">
+              <Checkbox
+                id="inactive-font-transparent"
+                checked={editorSettings.font.inactiveFontTransparent}
+                onCheckedChange={(checked: boolean) => handleUpdateFontSetting('inactiveFontTransparent', checked)}
+              />
+              <Label htmlFor="inactive-font-transparent">50% прозрачности для неактивных</Label>
             </div>
             <div className="space-y-0.5"> {/* Changed space-y-1.5 to space-y-0.5 */}
               <Label>Насыщенность</Label>

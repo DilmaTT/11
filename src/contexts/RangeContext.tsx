@@ -51,6 +51,7 @@ export interface EditorSettings {
     customSize: string;
     color: 'auto' | 'white' | 'black';
     weight: 'normal' | 'bold';
+    inactiveFontTransparent: boolean; // New property for 50% transparency
   };
 }
 
@@ -70,6 +71,7 @@ const defaultEditorSettings: EditorSettings = {
     customSize: '14px',
     color: 'white',
     weight: 'normal',
+    inactiveFontTransparent: false, // Default to false
   },
 };
 
@@ -136,6 +138,10 @@ export const RangeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
       if (!['normal', 'bold'].includes(settings.font.weight)) {
         settings.font.weight = defaultEditorSettings.font.weight;
+      }
+      // Ensure inactiveFontTransparent is set, default to false if not present
+      if (typeof settings.font.inactiveFontTransparent === 'undefined') {
+        settings.font.inactiveFontTransparent = defaultEditorSettings.font.inactiveFontTransparent;
       }
 
       return settings;
