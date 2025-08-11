@@ -15,13 +15,6 @@ interface PokerMatrixProps {
   sizeVariant?: 'default' | 'editorPreview';
 }
 
-const getActionColor = (actionId: string, buttons: ActionButton[]): string => {
-  if (actionId === 'fold') return '#6b7280';
-  const button = buttons.find(b => b.id === actionId);
-  if (button && button.type === 'simple') return button.color;
-  return '#ffffff'; 
-};
-
 const getBorderRadiusClass = (radius: EditorSettings['cellBorderRadius']) => ({
   'none': 'rounded-none', 'sm': 'rounded-sm', 'md': 'rounded-md', 'lg': 'rounded-lg'
 }[radius] || 'rounded-md');
@@ -50,12 +43,19 @@ const getFontWeightClass = (weight: EditorSettings['font']['weight']) => ({
 
 export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionButtons, readOnly = false, isBackgroundMode = false }: PokerMatrixProps) => {
   const isMobile = useIsMobile();
-  const { editorSettings } = useRangeContext();
+  const { editorSettings, foldColor } = useRangeContext();
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'select' | 'deselect' | null>(null);
   const lastHandSelectedDuringDrag = useRef<string | null>(null);
   const touchStarted = useRef(false);
   const hasDragged = useRef(false);
+
+  const getActionColor = (actionId: string, buttons: ActionButton[]): string => {
+    if (actionId === 'fold') return foldColor;
+    const button = buttons.find(b => b.id === actionId);
+    if (button && button.type === 'simple') return button.color;
+    return '#ffffff'; 
+  };
 
   useEffect(() => {
     if (isBackgroundMode) {
@@ -148,11 +148,12 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
     } else {
       if (cellBackgroundColor.type === 'white') {
         finalBgColor = '#ffffff';
-        style.backgroundColor = finalBgColor;
       } else if (cellBackgroundColor.type === 'custom') {
         finalBgColor = cellBackgroundColor.customColor;
-        style.backgroundColor = finalBgColor;
+      } else { // 'default'
+        finalBgColor = foldColor;
       }
+      style.backgroundColor = finalBgColor;
     }
 
     if (font.color === 'white') {
@@ -172,13 +173,9 @@ export const PokerMatrix = ({ selectedHands, onHandSelect, activeAction, actionB
 
   const getHandColorClass = (hand: string) => {
     if (selectedHands[hand]) return '';
-    const { font, cellBackgroundColor } = editorSettings;
+    const { cellBackgroundColor } = editorSettings;
     if (cellBackgroundColor.type === 'default') {
-      let classes = 'bg-muted/50 hover:bg-muted/70';
-      if (font.color === 'auto') {
-        classes += ' text-muted-foreground';
-      }
-      return classes;
+      return 'hover:bg-muted/70';
     }
     return '';
   };

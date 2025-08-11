@@ -242,7 +242,7 @@ const FolderRangeTreeContent = ({
 export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
   const [editingButton, setEditingButton] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
-  const { folders, setFolders, actionButtons, setActionButtons } = useRangeContext();
+  const { folders, setFolders, actionButtons, setActionButtons, foldColor } = useRangeContext();
   
   const [selectedRange, setSelectedRange] = useState<string>(folders[0]?.ranges[0]?.id || '');
   const [activeAction, setActiveAction] = useState(actionButtons[0]?.id || 'raise');
@@ -605,7 +605,7 @@ export const RangeEditor = ({ isMobileMode = false }: RangeEditorProps) => {
   );
 
   const getActionColor = (actionId: string, allButtons: ActionButton[]): string => {
-    if (actionId === 'fold') return '#6b7280'; // Special case for Fold
+    if (actionId === 'fold') return foldColor; // Use foldColor from context
     const button = allButtons.find(b => b.id === actionId);
     if (button && button.type === 'simple') {
       return button.color;

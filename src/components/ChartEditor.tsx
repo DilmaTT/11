@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRangeContext } from "@/contexts/RangeContext";
 import { StoredChart, ChartButton } from "@/types/chart";
@@ -19,10 +20,11 @@ interface ChartEditorProps {
 }
 
 export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSaveChart }: ChartEditorProps) => {
-  const { folders, actionButtons } = useRangeContext();
+  const { folders, setFolders, actionButtons } = useRangeContext();
   const allRanges = folders.flatMap(folder => folder.ranges);
 
   const [chartName, setChartName] = useState(chart.name);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [buttons, setButtons] = useState<ChartButton[]>(chart.buttons);
   const [canvasWidth, setCanvasWidth] = useState(chart.canvasWidth || 800);
   const [canvasHeight, setCanvasHeight] = useState(chart.canvasHeight || 500);
@@ -135,7 +137,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       y: 50,
       width: 120,
       height: 40,
-      type: allRanges.length > 0 ? 'normal' : 'label',
+      type: allRanges.length > 0 ? 'button' : 'label',
       isFontAdaptive: true,
       fontSize: 16,
       fontColor: 'white',
@@ -143,14 +145,9 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
       legendIsMultiLine: true,
       showRandomizer: false,
       legendOverrides: {},
-      linkButtons: [
-        { enabled: false, text: '', position: 'center', targetRangeId: '' },
-        { enabled: false, text: '', position: 'center', targetRangeId: '' }
-      ],
-      showTitle: false,
-      titleText: '',
-      titleFontSize: 20,
-      titleAlignment: 'center',
+      linkButtons: Array(6).fill(null).map(() => ({
+        enabled: false, text: '', position: 'center', targetRangeId: ''
+      })),
     };
     setButtons((prev) => [...prev, newButton]);
     setEditingButton(newButton);
@@ -284,6 +281,7 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
     },
     legendIsMultiLine?: boolean;
   }) => {
+    // Update button-specific properties on the button state
     setEditingButton(prev => {
       if (!prev) return null;
       return { 
@@ -291,14 +289,31 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
         legendOverrides: newConfig.overrides,
         linkButtons: newConfig.linkButtonsConfig,
         legendIsMultiLine: newConfig.legendIsMultiLine,
-        ...(newConfig.titleConfig && {
-          showTitle: newConfig.titleConfig.showTitle,
-          titleText: newConfig.titleConfig.titleText,
-          titleFontSize: newConfig.titleConfig.titleFontSize,
-          titleAlignment: newConfig.titleConfig.titleAlignment,
-        })
       };
     });
+
+    // Update range-specific properties (title) directly in the context
+    if (newConfig.titleConfig && editingButton?.linkedItem) {
+      const rangeIdToUpdate = editingButton.linkedItem;
+      setFolders(currentFolders => 
+        currentFolders.map(folder => ({
+          ...folder,
+          ranges: folder.ranges.map(range => {
+            if (range.id === rangeIdToUpdate) {
+              return {
+                ...range,
+                showTitle: newConfig.titleConfig.showTitle,
+                titleText: newConfig.titleConfig.titleText,
+                titleFontSize: newConfig.titleConfig.titleFontSize,
+                titleAlignment: newConfig.titleConfig.titleAlignment,
+              };
+            }
+            return range;
+          }),
+        }))
+      );
+    }
+
     setIsLegendPreview(false); 
   };
 
@@ -322,7 +337,28 @@ export const ChartEditor = ({ isMobileMode = false, chart, onBackToCharts, onSav
             <Button variant="ghost" size="icon" onClick={handleBackButtonClick} title="Назад к чартам">
               <ArrowLeft className="h-6 w-6 text-foreground" />
             </Button>
-            <h1 className="text-3xl font-bold text-foreground">{chartName}</h1>
+            {isEditingName ? (
+              <Input
+                value={chartName}
+                onChange={(e) => setChartName(e.target.value)}
+                onBlur={() => setIsEditingName(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setIsEditingName(false);
+                  }
+                }}
+                className="text-3xl font-bold h-auto p-0 border-none focus-visible:ring-0 bg-transparent"
+                autoFocus
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-foreground">{chartName}</h1>
+                <Button variant="ghost" size="icon" onClick={() => setIsEditingName(true)} title="Редактировать название">
+                  <Edit className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

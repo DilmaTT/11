@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { StoredChart, ChartButton } from "@/types/chart"; // Import interfaces from new types file
+import { StoredChart, ChartButton } from "@/types/chart";
 import { Range, ActionButton as ActionButtonType } from "@/contexts/RangeContext";
 import { PokerMatrix } from "@/components/PokerMatrix";
 import { useRangeContext } from "@/contexts/RangeContext";
@@ -83,15 +83,15 @@ const CustomDialog = ({ isOpen, onClose, children, isMobileMode = false }) => {
     return (
         <div 
             className={cn(
-                "fixed inset-0 z-50 flex items-center justify-center bg-black/50",
-                isMobileMode ? "p-2" : "p-4"
+                "fixed inset-0 z-50 flex bg-black/50",
+                isMobileMode ? "items-stretch p-0" : "items-center justify-center p-2"
             )} 
             onClick={onClose}
         >
             <div 
                 className={cn(
-                    "bg-background rounded-lg shadow-2xl",
-                    isMobileMode ? "w-full p-0" : "w-auto p-4"
+                    "bg-background shadow-2xl",
+                    isMobileMode ? "w-full h-full rounded-none" : "w-auto p-4 rounded-lg"
                 )}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -121,23 +121,20 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
       const rawStats = localStorage.getItem('poker-range-access-statistics');
       if (rawStats) {
         const parsed = JSON.parse(rawStats);
-        // Ensure we have a valid object
         if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
           stats = parsed;
         }
       }
     } catch (error) {
       console.error("Error parsing range access statistics, starting fresh for this session.", error);
-      stats = {}; // Reset if parsing fails
+      stats = {};
     }
     
     try {
-      // Ensure the existing count is a number before incrementing
       const currentCount = Number(stats[rangeId]) || 0;
       stats[rangeId] = currentCount + 1;
       localStorage.setItem('poker-range-access-statistics', JSON.stringify(stats));
     } catch (error) {
-      // This could happen if localStorage is full
       console.error("Error saving range access statistics to localStorage.", error);
       alert("Не удалось сохранить статистику. Возможно, хранилище переполнено.");
     }
@@ -317,7 +314,10 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
 
       <CustomDialog isOpen={showMatrixDialog} onClose={handleCloseDialog} isMobileMode={isMobileMode}>
           {displayedRange && (
-            <div className="relative pt-10">
+            <div className={cn(
+              "relative flex flex-col h-full",
+              isMobileMode && "pb-[30px]" // Space for the back button
+            )}>
               {activeButton?.showRandomizer && randomNumber !== null && (
                 <div 
                   className="absolute top-0 right-0 font-bold z-10 rounded-md"
@@ -332,27 +332,35 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                 </div>
               )}
 
-              {activeButton?.showTitle && activeButton.titleText && (
+              {displayedRange.showTitle && displayedRange.titleText && (
                 <h3
-                  className="mb-2 px-4 font-bold text-white"
+                  className="pt-10 mb-2 px-4 font-bold text-white flex-shrink-0"
                   style={{
-                    fontSize: `${activeButton.titleFontSize || 20}px`,
-                    textAlign: activeButton.titleAlignment || 'center',
+                    fontSize: `${displayedRange.titleFontSize || 20}px`,
+                    textAlign: displayedRange.titleAlignment || 'center',
                   }}
                 >
-                  {activeButton.titleText}
+                  {displayedRange.titleText}
                 </h3>
               )}
 
-              <PokerMatrix
-                selectedHands={displayedRange.hands}
-                onHandSelect={() => {}}
-                activeAction=""
-                actionButtons={actionButtons}
-                readOnly={true}
-                isBackgroundMode={false}
-              />
-              <div className={cn(isMobileMode && "px-4")}>
+              <div className="flex-grow min-h-0 flex items-center justify-center">
+                <div className={cn(
+                  "aspect-square",
+                  isMobileMode ? "w-full" : "h-full"
+                )}>
+                  <PokerMatrix
+                    selectedHands={displayedRange.hands}
+                    onHandSelect={() => {}}
+                    activeAction=""
+                    actionButtons={actionButtons}
+                    readOnly={true}
+                    isBackgroundMode={false}
+                  />
+                </div>
+              </div>
+              
+              <div className={cn("flex-shrink-0", isMobileMode && "px-4 pb-4")}>
                 {activeButton?.showLegend && (
                   <Legend
                     usedActions={usedActions}
@@ -363,23 +371,35 @@ export const ChartViewer = ({ isMobileMode = false, chart, allRanges, onBackToCh
                 )}
                 {activeButton?.linkButtons && activeButton.linkButtons.some(b => b.enabled) && (
                   <div className={cn(
-                    "mt-4 flex gap-4",
+                    "mt-4 flex",
                     linkButtonContainerPositionClass[activeButton.linkButtons[0].position]
                   )}>
-                    {activeButton.linkButtons.map((linkButton, index) => (
-                      linkButton.enabled && linkButton.targetRangeId && (
-                        <Button
-                          key={index}
-                          onClick={() => handleLinkButtonClick(linkButton.targetRangeId)}
-                          className="bg-green-600 hover:bg-green-700 text-white font-bold w-20 h-6 px-2 text-xs"
-                        >
-                          {linkButton.text || "Перейти"}
-                        </Button>
-                      )
-                    ))}
+                    <div className="grid grid-cols-3 gap-2">
+                      {activeButton.linkButtons.map((linkButton, index) => (
+                        linkButton.enabled && linkButton.targetRangeId && (
+                          <Button
+                            key={index}
+                            onClick={() => handleLinkButtonClick(linkButton.targetRangeId)}
+                            className="bg-green-600 hover:bg-green-700 text-white font-bold h-8 px-2 text-xs"
+                          >
+                            {linkButton.text || "Перейти"}
+                          </Button>
+                        )
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
+
+              {isMobileMode && (
+                <Button
+                  onClick={handleCloseDialog}
+                  className="absolute bottom-0 left-0 w-full rounded-none text-white font-bold bg-gray-800 hover:bg-gray-700 z-20"
+                  style={{ height: '30px' }}
+                >
+                  Назад
+                </Button>
+              )}
             </div>
           )}
       </CustomDialog>

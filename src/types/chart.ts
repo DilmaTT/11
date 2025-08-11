@@ -1,38 +1,38 @@
+import { StoredRange } from './range';
+
 export interface ChartButton {
   id: string;
   name: string;
-  color: string;
-  linkedItem: string; // Can be a range ID or 'label-only' or 'exit'
   x: number;
   y: number;
   width: number;
   height: number;
-  type: 'normal' | 'label' | 'exit';
-  isFontAdaptive?: boolean;
-  fontSize?: number;
+  color: string;
   fontColor?: string;
-  showLegend?: boolean;
+  fontSize?: number;
+  isFontAdaptive?: boolean;
+  type: 'button' | 'label' | 'exit';
+  linkedItem?: string; // rangeId for 'button' type
+
+  // Legend/Display options that are specific to the button's context
   showRandomizer?: boolean;
-  legendOverrides?: Record<string, string>;
+  showLegend?: boolean;
   legendIsMultiLine?: boolean;
-  linkButtons?: Array<{
+  legendOverrides?: Record<string, string>;
+  linkButtons?: {
     enabled: boolean;
     text: string;
     position: 'left' | 'center' | 'right';
     targetRangeId: string;
-  }>;
-  // Title properties
-  showTitle?: boolean;
-  titleText?: string;
-  titleFontSize?: number;
-  titleAlignment?: 'left' | 'center';
+  }[];
+
+  // Title properties have been moved to the Range/StoredRange interface
 }
 
 export interface StoredChart {
   id: string;
-  name:string;
+  name: string;
   buttons: ChartButton[];
   canvasWidth: number;
   canvasHeight: number;
-  rangeAccessStats?: Record<string, number>; // New field for range access statistics
 }

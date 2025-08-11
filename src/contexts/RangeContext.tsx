@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface SimpleActionButton {
   type: 'simple';
@@ -22,6 +22,11 @@ export interface Range {
   id: string;
   name: string;
   hands: Record<string, string>;
+  // Title properties are now part of the range
+  showTitle?: boolean;
+  titleText?: string;
+  titleFontSize?: number;
+  titleAlignment?: 'left' | 'center';
 }
 
 export interface Folder {
@@ -63,7 +68,7 @@ const defaultEditorSettings: EditorSettings = {
   font: {
     size: 'm',
     customSize: '14px',
-    color: 'white', // Changed default font color to white
+    color: 'white',
     weight: 'normal',
   },
 };
@@ -75,6 +80,7 @@ interface RangeContextType {
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
   setActionButtons: React.Dispatch<React.SetStateAction<ActionButton[]>>;
   setEditorSettings: React.Dispatch<React.SetStateAction<EditorSettings>>;
+  foldColor: string;
 }
 
 const RangeContext = createContext<RangeContextType | undefined>(undefined);
@@ -87,7 +93,7 @@ export const useRangeContext = () => {
   return context;
 };
 
-export const RangeProvider = ({ children }: { children: ReactNode }) => {
+export const RangeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [folders, setFolders] = useState<Folder[]>(() => {
     const saved = localStorage.getItem('poker-ranges-folders');
     return saved ? JSON.parse(saved) : [{
@@ -138,6 +144,8 @@ export const RangeProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
+  const [foldColor, setFoldColor] = useState<string>('#6b7280');
+
   useEffect(() => {
     localStorage.setItem('poker-ranges-folders', JSON.stringify(folders));
   }, [folders]);
@@ -150,8 +158,25 @@ export const RangeProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('poker-editor-settings', JSON.stringify(editorSettings));
   }, [editorSettings]);
 
+  useEffect(() => {
+    const matrixBgType = editorSettings.matrixBackgroundColor.type;
+    const cellBgType = editorSettings.cellBackgroundColor.type;
+
+    let newColor = '#6b7280'; // Default fallback
+
+    if (matrixBgType === 'dark' && cellBgType === 'default') {
+      newColor = '#161b26';
+    } else if (matrixBgType === 'white' && cellBgType === 'default') {
+      newColor = '#8f949d';
+    } else if (matrixBgType === 'white' && cellBgType === 'white') {
+      newColor = '#ffffff';
+    }
+
+    setFoldColor(newColor);
+  }, [editorSettings]);
+
   return (
-    <RangeContext.Provider value={{ folders, actionButtons, editorSettings, setFolders, setActionButtons, setEditorSettings }}>
+    <RangeContext.Provider value={{ folders, actionButtons, editorSettings, setFolders, setActionButtons, setEditorSettings, foldColor }}>
       {children}
     </RangeContext.Provider>
   );

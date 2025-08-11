@@ -22,7 +22,7 @@ import { PokerMatrix } from "@/components/PokerMatrix";
 import { StoredRange, Folder } from '@/types/range';
 import { ActionButton as ActionButtonType } from "@/contexts/RangeContext";
 import { ChartButton } from '@/types/chart';
-import { Separator } from '../ui/separator';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Helper function to get the color for a simple action
 const getActionColor = (actionId: string, allButtons: ActionButtonType[]): string => {
@@ -50,7 +50,7 @@ const getActionButtonStyle = (button: ActionButtonType, allButtons: ActionButton
 };
 
 type LinkButtonConfig = NonNullable<ChartButton['linkButtons']>[0];
-type TitleConfig = {
+export type TitleConfig = {
   showTitle: boolean;
   titleText: string;
   titleFontSize: number;
@@ -106,7 +106,7 @@ const LinkButtonEditor = ({
   };
 
   return (
-    <div className="space-y-4 pl-6">
+    <div className="space-y-4">
       <div>
         <Label htmlFor={`link-button-text-${buttonIndex}`}>Текст на кнопке</Label>
         <Input
@@ -181,27 +181,28 @@ export const LegendPreviewDialog = ({
     titleAlignment: 'center',
   });
   const [legendIsMultiLine, setLegendIsMultiLine] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isOpen) {
       setTempLegendOverrides(editingButton?.legendOverrides || {});
       
       const initialLinkConfigs = editingButton?.linkButtons || [];
-      const filledLinkConfigs: LinkButtonConfig[] = Array(2).fill(null).map((_, index) => ({
+      const filledLinkConfigs: LinkButtonConfig[] = Array(6).fill(null).map((_, index) => ({
         ...(initialLinkConfigs[index] || { enabled: false, text: '', position: 'center', targetRangeId: '' })
       }));
       setLinkButtonConfigs(filledLinkConfigs);
 
       setTitleConfig({
-        showTitle: editingButton?.showTitle || false,
-        titleText: editingButton?.titleText || '',
-        titleFontSize: editingButton?.titleFontSize || 20,
-        titleAlignment: editingButton?.titleAlignment || 'center',
+        showTitle: linkedRange?.showTitle || false,
+        titleText: linkedRange?.titleText || linkedRange?.name || '',
+        titleFontSize: linkedRange?.titleFontSize || 20,
+        titleAlignment: linkedRange?.titleAlignment || 'center',
       });
 
       setLegendIsMultiLine(editingButton?.legendIsMultiLine ?? true);
     }
-  }, [isOpen, editingButton]);
+  }, [isOpen, editingButton, linkedRange]);
 
   const handleSave = () => {
     const cleanedOverrides: Record<string, string> = {};
@@ -222,8 +223,12 @@ export const LegendPreviewDialog = ({
   const handleLinkButtonConfigChange = (index: number, newConfig: LinkButtonConfig) => {
     const updatedConfigs = [...linkButtonConfigs];
     updatedConfigs[index] = newConfig;
+    
     if (index === 0) {
-      updatedConfigs[1] = { ...updatedConfigs[1], position: newConfig.position };
+      const newPosition = newConfig.position;
+      for (let i = 1; i < updatedConfigs.length; i++) {
+        updatedConfigs[i] = { ...updatedConfigs[i], position: newPosition };
+      }
     }
     setLinkButtonConfigs(updatedConfigs);
   };
@@ -234,9 +239,26 @@ export const LegendPreviewDialog = ({
     return actionButtons.filter(action => usedActionIds.has(action.id));
   }, [linkedRange, actionButtons]);
 
+  const positionClass = useMemo(() => {
+    const alignment = linkButtonConfigs[0]?.position || 'center';
+    return {
+      left: 'justify-start',
+      center: 'justify-center',
+      right: 'justify-end',
+    }[alignment];
+  }, [linkButtonConfigs]);
+
+  const enabledButtons = useMemo(() => {
+    return linkButtonConfigs.filter(b => b.enabled && b.text.trim() !== '');
+  }, [linkButtonConfigs]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl sm:max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="max-w-4xl sm:max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        mobileFullscreen={isMobile}
+      >
         <DialogHeader>
           <DialogTitle>Предпросмотр и редактирование</DialogTitle>
         </DialogHeader>
@@ -326,27 +348,45 @@ export const LegendPreviewDialog = ({
 
             <div className="mt-6 pt-4 border-t">
               <h4 className="font-semibold mb-3">Кнопки-ссылки на другой ренж</h4>
-              {linkButtonConfigs.map((config, index) => (
-                <div key={index}>
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Checkbox
-                      id={`enable-link-button-${index}`}
-                      checked={config.enabled}
-                      onCheckedChange={(checked) => handleLinkButtonConfigChange(index, { ...config, enabled: !!checked })}
-                    />
-                    <Label htmlFor={`enable-link-button-${index}`}>Показывать кнопку-ссылку #{index + 1}</Label>
+              
+              {enabledButtons.length > 0 && (
+                <div className="space-y-2 mb-6">
+                  <Label>Предпросмотр кнопок</Label>
+                  <div className={`p-4 border rounded-lg bg-muted/40 flex ${positionClass}`}>
+                    <div className="grid grid-cols-3 gap-2">
+                      {enabledButtons.map((btn, i) => (
+                        <Button key={i} variant="outline" size="sm" className="pointer-events-none">
+                          {btn.text}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  {config.enabled && (
-                    <LinkButtonEditor
-                      config={config}
-                      onConfigChange={(newConfig) => handleLinkButtonConfigChange(index, newConfig)}
-                      folders={folders}
-                      buttonIndex={index}
-                    />
-                  )}
-                  {index === 0 && linkButtonConfigs.length > 1 && <Separator className="my-4" />}
                 </div>
-              ))}
+              )}
+
+              <Label>Настройки кнопок</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
+                {linkButtonConfigs.map((config, index) => (
+                  <div key={index} className="p-4 border rounded-lg">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Checkbox
+                        id={`enable-link-button-${index}`}
+                        checked={config.enabled}
+                        onCheckedChange={(checked) => handleLinkButtonConfigChange(index, { ...config, enabled: !!checked })}
+                      />
+                      <Label htmlFor={`enable-link-button-${index}`} className="font-semibold">Кнопка-ссылка #{index + 1}</Label>
+                    </div>
+                    {config.enabled && (
+                      <LinkButtonEditor
+                        config={config}
+                        onConfigChange={(newConfig) => handleLinkButtonConfigChange(index, newConfig)}
+                        folders={folders}
+                        buttonIndex={index}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

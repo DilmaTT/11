@@ -69,42 +69,8 @@ const generateHandDisplayInfo = (hand: string) => {
   return { hand, cards: cardsInfo };
 };
 
-
-const getActionColor = (actionId: string, allButtons: ActionButton[]): string => {
-    if (actionId === 'fold') return '#6b7280';
-    const button = allButtons.find(b => b.id === actionId);
-    if (button && button.type === 'simple') {
-        return button.color;
-    }
-    // For weighted buttons, we need to find the base simple buttons
-    const weightedButton = allButtons.find(b => b.id === actionId);
-    if (weightedButton && weightedButton.type === 'weighted') {
-        // This case is handled by getActionButtonStyle, but as a fallback we can return a default
-        return '#ffffff';
-    }
-    return '#ffffff';
-};
-
-const getActionButtonStyle = (button: ActionButton, allButtons: ActionButton[]) => {
-    if (button.type === 'simple') {
-        return { backgroundColor: button.color, color: 'white' };
-    }
-    if (button.type === 'weighted') {
-        const action1Button = allButtons.find(b => b.id === button.action1Id);
-        const action2Button = allButtons.find(b => b.id === button.action2Id);
-        const color1 = action1Button ? action1Button.color : '#ffffff';
-        const color2 = action2Button ? action2Button.color : '#ffffff';
-        
-        return {
-            background: `linear-gradient(to right, ${color1} ${button.weight}%, ${color2} ${button.weight}%)`,
-            color: 'white',
-        };
-    }
-    return {};
-};
-
 export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
-  const { folders, actionButtons } = useRangeContext();
+  const { folders, actionButtons, foldColor } = useRangeContext();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
@@ -128,6 +94,31 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
   const [trainingResults, setTrainingResults] = useState<any>(null);
 
   const autoProceedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getActionColor = (actionId: string, allButtons: ActionButton[]): string => {
+    if (actionId === 'fold') return foldColor;
+    const button = allButtons.find(b => b.id === actionId);
+    if (button && button.type === 'simple') {
+        return button.color;
+    }
+    return '#ffffff'; // Fallback color
+  };
+
+  const getActionButtonStyle = (button: ActionButton, allButtons: ActionButton[]) => {
+      if (button.type === 'simple') {
+          return { backgroundColor: button.color, color: 'white' };
+      }
+      if (button.type === 'weighted') {
+          const color1 = getActionColor(button.action1Id, allButtons);
+          const color2 = getActionColor(button.action2Id, allButtons);
+          
+          return {
+              background: `linear-gradient(to right, ${color1} ${button.weight}%, ${color2} ${button.weight}%)`,
+              color: 'white',
+          };
+      }
+      return {};
+  };
 
   const trainingRanges = useMemo(() => {
     const ranges = [];
@@ -557,8 +548,9 @@ export const TrainingSession = ({ training, onStop }: TrainingSessionProps) => {
                     size="sm"
                     onClick={() => handleClassicAnswer('fold')}
                     disabled={canProceed} // Disable after answer
+                    style={{ backgroundColor: foldColor }}
                     className={cn(
-                      "bg-gray-500 text-white hover:bg-gray-600 text-xs sm:text-sm px-3 sm:px-4",
+                      "text-white hover:opacity-80 text-xs sm:text-sm px-3 sm:px-4",
                       feedback === 'incorrect' && getCorrectAction(currentHand) === 'fold' && "ring-2 ring-green-500"
                     )}
                   >
